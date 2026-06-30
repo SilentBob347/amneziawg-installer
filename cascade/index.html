@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Two-server cascade VPN: Russian traffic direct, rest abroad</title>
+<title>Two-server cascade VPN: Russian traffic direct, the rest abroad</title>
 <meta name="description" content="A two-server cascade (double VPN) on AmneziaWG: Russian traffic exits directly from a Russian IP, everything else goes through a foreign exit server. Split on the server.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/cascade/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/cascade/">
@@ -39,7 +39,8 @@
     { "@type": "Question", "name": "Do clients need special configuration?", "acceptedAnswer": { "@type": "Answer", "text": "No. The split lives entirely on the entry server. Clients are added as usual and need no special setup - they just connect to the entry server." } },
     { "@type": "Question", "name": "Is the cascade part of the installer?", "acceptedAnswer": { "@type": "Answer", "text": "No. A multi-server cascade is a separate manual setup on top of two normal amneziawg-installer installs. There is a step-by-step guide with a verified routing script and a systemd unit for boot persistence." } },
     { "@type": "Question", "name": "Where do the Russian networks come from?", "acceptedAnswer": { "@type": "Answer", "text": "From the aggregated Russian IP zone (ipdeny), loaded into an ipset. Traffic to those networks is routed direct; everything else is marked and sent through the foreign exit. The list is refreshed on a schedule." } },
-    { "@type": "Question", "name": "Why does YouTube buffer and Google Play fail in a cascade?", "acceptedAnswer": { "@type": "Answer", "text": "Some of Google's and YouTube's nodes (their caches and CDN) are hosted on Russian IPs and land in the Russian-networks list, so connections to them go directly via the entry server and Google sees a Russian address. Changing DNS does not reliably help, since Google's networks are largely shared. To make Google and YouTube always use the foreign exit, their networks (not just AS15169 - GGC cache nodes often live in ISP networks) must be marked before the RETURN rule or excluded from the Russian-networks list." } }
+    { "@type": "Question", "name": "Why does YouTube buffer and Google Play fail in a cascade?", "acceptedAnswer": { "@type": "Answer", "text": "Some of Google's and YouTube's nodes (their caches and CDN) are hosted on Russian IPs and land in the Russian-networks list, so connections to them go directly via the entry server and Google sees a Russian address. Changing DNS does not reliably help, since Google's networks are largely shared. To make Google and YouTube always use the foreign exit, their networks (not just AS15169 - GGC cache nodes often live in ISP networks) must be marked before the RETURN rule or excluded from the Russian-networks list." } },
+    { "@type": "Question", "name": "Why is upload much slower than download?", "acceptedAnswer": { "@type": "Answer", "text": "If download is fine but upload drops to almost nothing, it is usually not MTU (that clips segments both ways, so download would suffer too) and not the CPU (that would slow both directions at once). A healthy download proves the entry server feeds the client at full speed; the bottleneck is the leg from the entry server to the exit server, the one upload travels out on. Likely causes: egress shaping at the entry host, poor peering to the exit network, or an inbound limit on the exit itself. Measure that leg directly: on the exit server run iperf3 -s, and from the entry server run iperf3 -c EXIT-IP for upload and iperf3 -c EXIT-IP -R for download. A low first number with a normal second confirms the squeeze is between the servers, not the servers themselves." } }
   ]
 }
 </script>
@@ -62,7 +63,7 @@
   "inLanguage": "en",
   "image": "https://bivlked.github.io/amneziawg-installer/assets/og-cascade.png",
   "datePublished": "2026-06-15",
-  "dateModified": "2026-06-15",
+  "dateModified": "2026-06-30",
   "author": { "@type": "Person", "name": "bivlked" },
   "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
   "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/cascade/",
@@ -184,6 +185,7 @@
       <details><summary>Is the cascade part of the installer?</summary><div class="answer">No. A multi-server cascade is a separate manual setup on top of two normal amneziawg-installer installs. There is a step-by-step guide with a verified routing script and a systemd unit for boot persistence.</div></details>
       <details><summary>Where do the Russian networks come from?</summary><div class="answer">From the aggregated Russian IP zone (ipdeny), loaded into an ipset. Traffic to those networks is routed direct; everything else is marked and sent through the foreign exit. The list is refreshed on a schedule.</div></details>
       <details><summary>Why does YouTube buffer and Google Play fail in a cascade?</summary><div class="answer">Some of Google's and YouTube's nodes (their caches and CDN) are hosted on Russian IPs and land in the Russian-networks list, so connections to them go directly via the entry server and Google sees a Russian address. Changing DNS does not reliably help, since Google's networks are largely shared. To make Google and YouTube always use the foreign exit, their networks (not just AS15169 - GGC cache nodes often live in ISP networks) must be marked before the RETURN rule or excluded from the Russian-networks list.</div></details>
+      <details><summary>Why is upload much slower than download?</summary><div class="answer">If download is fine but upload drops to almost nothing, it is usually not MTU (that clips segments both ways, so download would suffer too) and not the CPU (that would slow both directions at once). A healthy download proves the entry server feeds the client at full speed; the bottleneck is the leg from the entry server to the exit server, the one upload travels out on. Likely causes: egress shaping at the entry host, poor peering to the exit network, or an inbound limit on the exit itself. Measure that leg directly: on the exit server run <code>iperf3 -s</code>, and from the entry server run <code>iperf3 -c EXIT-IP</code> for upload and <code>iperf3 -c EXIT-IP -R</code> for download. A low first number with a normal second confirms the squeeze is between the servers, not the servers themselves.</div></details>
     </div>
   </div>
 </section>

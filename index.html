@@ -38,11 +38,22 @@
   "description": "One-command installer and management toolkit for a self-hosted AmneziaWG 2.0 VPN on Ubuntu and Debian servers.",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Ubuntu 24.04, Ubuntu 25.10, Ubuntu 26.04, Debian 12, Debian 13",
+  "softwareVersion": "5.18.1",
   "license": "https://opensource.org/licenses/MIT",
   "codeRepository": "https://github.com/bivlked/amneziawg-installer",
   "url": "https://bivlked.github.io/amneziawg-installer/",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "bivlked" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "amneziawg-installer",
+  "url": "https://bivlked.github.io/amneziawg-installer/",
+  "inLanguage": "en",
+  "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } }
 }
 </script>
 <script type="application/ld+json">
@@ -55,7 +66,8 @@
     { "@type": "Question", "name": "Which VPS should I pick?", "acceptedAnswer": { "@type": "Answer", "text": "A clean Ubuntu or Debian VPS with 1 vCPU and at least 512 MB of RAM. It is meant for a dedicated VPS, not a home router or shared hosting." } },
     { "@type": "Question", "name": "Does it bypass DPI and censorship?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today." } },
     { "@type": "Question", "name": "Does it run on ARM and Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one." } },
-    { "@type": "Question", "name": "How do I update to a new release?", "acceptedAnswer": { "@type": "Answer", "text": "Download the new release script on the same server and run it with the --force flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot." } }
+    { "@type": "Question", "name": "How do I update to a new release?", "acceptedAnswer": { "@type": "Answer", "text": "Download the new release script on the same server and run it with the --force flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot." } },
+    { "@type": "Question", "name": "AmneziaWG won't connect, though plain WireGuard works?", "acceptedAnswer": { "@type": "Answer", "text": "Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the [Interface] parameters on the server and the client: Jc/Jmin/Jmax, S1-S4, H1-H4, and in version 2.0 I1-I5. Every value must match byte for byte, and I1-I5 are case-sensitive (uppercase only); if I1 is present on one side but absent on the other, the side without it falls back to 1.0 and the handshake silently fails. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the detailed troubleshooting guide." } }
   ]
 }
 </script>
@@ -215,6 +227,7 @@
       <details><summary>Does it bypass DPI and censorship?</summary><div class="answer">AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today.</div></details>
       <details><summary>Does it run on ARM and Raspberry Pi?</summary><div class="answer">Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one.</div></details>
       <details><summary>How do I update to a new release?</summary><div class="answer">Download the new release script on the same server and run it with the <code>--force</code> flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot.</div></details>
+      <details><summary>AmneziaWG won't connect, though plain WireGuard works?</summary><div class="answer">Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the <code>[Interface]</code> parameters on the server and the client: Jc/Jmin/Jmax, S1-S4, H1-H4, and in version 2.0 I1-I5. Every value must match byte for byte, and I1-I5 are case-sensitive (uppercase only); if I1 is present on one side but absent on the other, the side without it falls back to 1.0 and the handshake silently fails. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.en.md#troubleshooting-adv">detailed troubleshooting guide</a>.</div></details>
     </div>
   </div>
 </section>

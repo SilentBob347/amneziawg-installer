@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Чем amneziawg-installer отличается от приложения Amnezia</title>
-<meta name="description" content="Чем amneziawg-installer отличается от официального приложения Amnezia: тот же протокол AmneziaWG 2.0, но без Docker, с оптимизацией и защитой всего сервера и тонкой настройкой обфускации.">
+<meta name="description" content="Чем amneziawg-installer отличается от приложения Amnezia: тот же протокол AmneziaWG 2.0, но без Docker, с оптимизацией и защитой всего сервера.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/compare/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/compare/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/compare/">
@@ -63,7 +63,7 @@
   "inLanguage": "ru",
   "image": "https://bivlked.github.io/amneziawg-installer/assets/og-compare-ru.png",
   "datePublished": "2026-06-15",
-  "dateModified": "2026-06-23",
+  "dateModified": "2026-06-30",
   "author": { "@type": "Person", "name": "bivlked" },
   "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
   "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/ru/compare/",
@@ -178,9 +178,9 @@
     <div class="faq">
       <details><summary>Чем он отличается от официального приложения Amnezia?</summary><div class="answer">Оба работают на одном протоколе AmneziaWG 2.0. Официальное приложение это GUI, который разворачивает серверную часть в Docker по SSH. Этот установщик обходится без Docker и ставит AmneziaWG модулем ядра, а затем оптимизирует и харднит весь сервер под одну задачу - меньше оверхеда, меньше поверхность атаки и тонкая настройка обфускации.</div></details>
       <details><summary>Использует ли он Docker на сервере?</summary><div class="answer">Нет. AmneziaWG ставится модулем ядра через DKMS, поэтому в фоне не работает ни Docker-демон, ни стек контейнеров. Это держит расход RAM и CPU низким - что особенно важно на дешёвом VPS, но полезно на любом сервере.</div></details>
-      <details><summary>Оптимизирует ли он сам сервер?</summary><div class="answer">Да. Скрипт определяет RAM и сетевую карту, затем настраивает sysctl-буферы, размер swap и офлоады NIC и включает BBR. Ещё он вырезает лишние пакеты, чтобы сервер делал одну задачу. Официальное приложение разворачивает контейнеры и сам сервер не оптимизирует и не настраивает.</div></details>
+      <details><summary>Оптимизирует ли он сам сервер?</summary><div class="answer">Да. Скрипт определяет RAM и сетевую карту, затем настраивает sysctl-буферы, размер swap и офлоады NIC и включает BBR. Ещё он вырезает лишние пакеты и службы, чтобы сервер делал одну задачу. Официальное приложение разворачивает контейнеры и сам сервер не оптимизирует и не настраивает.</div></details>
       <details><summary>Можно ли подстроить обфускацию под оператора или сеть?</summary><div class="answer">Да. Есть пресет для мобильных сетей, прямой доступ к параметрам AmneziaWG 2.0 и полевые данные по поведению DPI, так что обфускацию можно подстроить под конкретного оператора или сеть.</div></details>
-      <details><summary>Протокол и защита те же самые?</summary><div class="answer">Да. Под капотом тот же AmneziaWG 2.0, поэтому обфускация против DPI одна и та же. Установщик с открытым кодом под лицензией MIT, читаемый bash, который можно просмотреть перед запуском, и более 800 автотестов. Ставится тот же upstream AmneziaWG - автоматизация и настройка сервера, а не форк протокола.</div></details>
+      <details><summary>Протокол и защита те же самые?</summary><div class="answer">Да. Под капотом тот же AmneziaWG 2.0, поэтому обфускация против DPI одна и та же. Установщик с открытым кодом под лицензией MIT, читаемый bash, который можно просмотреть перед запуском, и на нём более 800 автотестов. Ставится тот же upstream AmneziaWG - автоматизация и настройка сервера, а не форк протокола.</div></details>
       <details><summary>Чем он отличается от других скриптов установки AmneziaWG?</summary><div class="answer">amneziawg-installer делает упор на полностью настроенный VPS под одну задачу: более глубокая оптимизация и защита сервера, тюнинг обфускации под мобильные сети и DPI, клиенты с истечением срока, полноценные русская и английская версии и без веб-панели по умолчанию. Многие другие скрипты останавливаются на рабочем туннеле или добавляют веб-панель, а этот автоматизирует весь сервер целиком и проверен более чем 800 автотестами.</div></details>
       <details><summary>Чем он отличается от wiresock/amneziawg-install?</summary><div class="answer">Оба ставят AmneziaWG 2.0 из bash. wiresock - более широкий стек: опциональная нативная веб-панель и опциональный обфускация-прокси на Rust, который делает трафик похожим на другой протокол (QUIC, DNS, STUN, SIP) для сопротивления активному зондированию; серверная маскировка работает с любым стандартным AmneziaWG-клиентом, а полная двунаправленная маскировка требует WireSock Secure Connect. Этот проект остаётся установщиком под одну задачу: обфускация живёт в самом конфиге AmneziaWG 2.0 (параметры I1-I5/CPS), настроена под типовой мобильный DPI, без отдельного прокси-демона и без платного клиента. Плюс готовые ARM-сборки, клиенты с истечением срока, импорт по vpn://-ссылке одним тапом и полноценные русская и английская версии. Если нужна браузерная панель или устойчивость к активному зондированию через отдельный прокси, подойдёт стек wiresock; если нужен простой VPS-установщик для типового DPI, подойдёт этот проект.</div></details>
     </div>
