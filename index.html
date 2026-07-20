@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AmneziaWG 2.0 VPN Installer for Ubuntu and Debian VPS</title>
-<meta name="description" content="Set up a self-hosted AmneziaWG 2.0 VPN on a clean Ubuntu or Debian VPS with one command. DPI bypass, firewall hardening, and client management. MIT licensed.">
+<meta name="description" content="One command turns your own Ubuntu or Debian VPS into an AmneziaWG 2.0 VPN server. About twenty minutes, then a QR code for your phone. DPI bypass, hardened firewall, MIT licensed.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/">
@@ -42,6 +42,20 @@
   "license": "https://opensource.org/licenses/MIT",
   "codeRepository": "https://github.com/bivlked/amneziawg-installer",
   "url": "https://bivlked.github.io/amneziawg-installer/",
+  "installUrl": "https://github.com/bivlked/amneziawg-installer/releases/latest",
+  "processorRequirements": "1 vCPU, amd64 or arm64",
+  "memoryRequirements": "512 MB",
+  "storageRequirements": "5 GB",
+  "featureList": [
+    "One-command install on a clean Ubuntu or Debian VPS",
+    "AmneziaWG 2.0 obfuscation: junk packets, header masking H1-H4, padding S1-S4, I1-I5 concealment packets",
+    "UFW firewall, Fail2Ban, sysctl hardening and SSH rate limiting by default",
+    "Client management: add, remove, list, regenerate, QR codes, vpn:// links, expiring guest configs",
+    "JSON output for most management commands, for scripts and bots",
+    "Prebuilt ARM64 kernel modules for Raspberry Pi, Hetzner CAX, Oracle Ampere A1 and AWS Graviton",
+    "Resume after reboot and DKMS rebuild after kernel upgrades"
+  ],
+  "sameAs": ["https://github.com/bivlked/amneziawg-installer"],
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "bivlked" }
 }
@@ -67,6 +81,7 @@
     { "@type": "Question", "name": "Does it bypass DPI and censorship?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today." } },
     { "@type": "Question", "name": "Does it run on ARM and Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one." } },
     { "@type": "Question", "name": "How do I update to a new release?", "acceptedAnswer": { "@type": "Answer", "text": "Download the new release script on the same server and run it with the --force flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot." } },
+    { "@type": "Question", "name": "Can I drive it from a script or a bot?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Most management commands take --json and answer with a single JSON object even when the command failed, so the reply is always parseable. The exceptions: list and stats return an array, and show and diagnose do not take the flag. New fields show up over time; existing ones do not get renamed. For unattended runs there is --yes, and with AWG_STRICT_CONFIRM=1 a command like removing a client refuses to run when --yes is missing instead of quietly agreeing. A third-party Telegram bot, awgram, already runs on this interface." } },
     { "@type": "Question", "name": "AmneziaWG won't connect, though plain WireGuard works?", "acceptedAnswer": { "@type": "Answer", "text": "Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the [Interface] parameters on the server and the client: Jc/Jmin/Jmax, S1-S4, H1-H4, and in version 2.0 I1-I5. Every value must match byte for byte, and I1-I5 are case-sensitive (uppercase only); if I1 is present on one side but absent on the other, the side without it falls back to 1.0 and the handshake silently fails. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the detailed troubleshooting guide." } }
   ]
 }
@@ -112,12 +127,12 @@
       <span>Ubuntu and Debian</span>
       <span>x86_64 and ARM64</span>
       <span>No runtime dependencies</span>
-      <span>800+ automated tests</span>
+      <span>1100+ automated tests</span>
     </div>
     <figure class="hero-art" aria-hidden="true">
       <svg viewBox="0 0 760 132" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
         <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
-        <rect x="14" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="14" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="104" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Your device</text>
         <text x="104" y="87" text-anchor="middle" font-size="12" fill="#9aa7b4">one app, one tap</text>
         <line x1="198" y1="71" x2="288" y2="71" stroke="#3ddc97" stroke-width="2" marker-end="url(#ar)"/>
@@ -128,7 +143,7 @@
         <text x="380" y="102" text-anchor="middle" font-size="12" fill="#9aa7b4">hardened kernel module</text>
         <line x1="472" y1="71" x2="562" y2="71" stroke="#3ddc97" stroke-width="2" marker-end="url(#ar)"/>
         <text x="517" y="60" text-anchor="middle" font-size="11.5" fill="#9aa7b4">DPI-resistant</text>
-        <rect x="566" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="566" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <circle cx="600" cy="71" r="13" fill="none" stroke="#3ddc97" stroke-width="1.6"/>
         <path d="M587 71h26M600 58c6 4 6 22 0 26M600 58c-6 4-6 22 0 26" fill="none" stroke="#3ddc97" stroke-width="1.2"/>
         <text x="660" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Internet</text>
@@ -157,6 +172,8 @@
       <div class="card"><div class="ico" aria-hidden="true">&#127760;</div><h3>IPv6 dual-stack</h3><p>Optional dual-stack routing, off by default and enabled with a single flag when you need it.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128421;</div><h3>ARM and Raspberry Pi</h3><p>Prebuilt kernel modules for Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128260;</div><h3>Survives reboots</h3><p>A resume-after-reboot state machine, plus DKMS auto-repair that rebuilds the module after kernel upgrades.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#129302;</div><h3>Scripts and bots can drive it</h3><p>Most management commands take <code>--json</code> and answer with a single object even when something fails (<code>list</code> and <code>stats</code> return an array). A third-party Telegram bot already runs on it.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128225;</div><h3>Cellular carriers</h3><p>The <code>--mobile</code> flag turns on a cellular profile and, unless you pass a port yourself, picks 443/udp, because carriers often drop traffic on unusual UDP ports.</p></div>
     </div>
   </div>
 </section>
@@ -227,6 +244,7 @@
       <details><summary>Does it bypass DPI and censorship?</summary><div class="answer">AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today.</div></details>
       <details><summary>Does it run on ARM and Raspberry Pi?</summary><div class="answer">Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one.</div></details>
       <details><summary>How do I update to a new release?</summary><div class="answer">Download the new release script on the same server and run it with the <code>--force</code> flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot.</div></details>
+      <details><summary>Can I drive it from a script or a bot?</summary><div class="answer">Yes. Most management commands take <code>--json</code> and answer with a single JSON object even when the command failed, so the reply is always parseable. The exceptions: <code>list</code> and <code>stats</code> return an array, and <code>show</code> and <code>diagnose</code> do not take the flag. New fields show up over time; existing ones do not get renamed. For unattended runs there is <code>--yes</code>, and with <code>AWG_STRICT_CONFIRM=1</code> a command like removing a client refuses to run when <code>--yes</code> is missing instead of quietly agreeing. A third-party Telegram bot, <a href="https://github.com/ekuraev/awgram">awgram</a>, already runs on this interface.</div></details>
       <details><summary>AmneziaWG won't connect, though plain WireGuard works?</summary><div class="answer">Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the <code>[Interface]</code> parameters on the server and the client: Jc/Jmin/Jmax, S1-S4, H1-H4, and in version 2.0 I1-I5. Every value must match byte for byte, and I1-I5 are case-sensitive (uppercase only); if I1 is present on one side but absent on the other, the side without it falls back to 1.0 and the handshake silently fails. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.en.md#troubleshooting-adv">detailed troubleshooting guide</a>.</div></details>
     </div>
   </div>

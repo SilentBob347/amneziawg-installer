@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Каскадный VPN из двух серверов: российский трафик напрямую</title>
-<meta name="description" content="Каскадный VPN из двух серверов (двойной VPN) на AmneziaWG: российский трафик уходит напрямую с российского IP, остальное - через зарубежный выход. Деление на сервере.">
+<meta name="description" content="Каскадный VPN из двух серверов (двойной VPN) на AmneziaWG: российские сайты открываются с российского IP, остальное уходит через зарубежный выход. Нужны два VPS.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/cascade/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
@@ -63,7 +63,7 @@
   "inLanguage": "ru",
   "image": "https://bivlked.github.io/amneziawg-installer/assets/og-cascade-ru.png",
   "datePublished": "2026-06-15",
-  "dateModified": "2026-06-30",
+  "dateModified": "2026-07-20",
   "author": { "@type": "Person", "name": "bivlked" },
   "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
   "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/ru/cascade/",
@@ -97,6 +97,11 @@
       <a class="btn btn-primary" href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.md">Полная пошаговая инструкция</a>
       <a class="btn" href="#how">Как это работает</a>
     </div>
+    <div class="trust">
+      <span>Два VPS: один в России, второй за границей</span>
+      <span>На обоих уже стоит amneziawg-installer</span>
+      <span>У обоих реальный публичный IP, не за NAT</span>
+    </div>
   </div>
 </section>
 
@@ -107,7 +112,7 @@
     <figure class="diagram">
       <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схема движения трафика: клиент одним подключением заходит на сервер-вход в России; российские сети уходят напрямую и видны с российского IP, а всё остальное идёт через зарубежный сервер-выход и видно с зарубежного IP." font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
         <defs><marker id="cad" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
-        <rect x="24" y="150" width="150" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="24" y="150" width="150" height="66" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="99" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Клиент</text>
         <text x="99" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">одно подключение</text>
         <line x1="176" y1="183" x2="232" y2="183" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
@@ -117,7 +122,7 @@
         <text x="342" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">в России, держит сплит</text>
         <path d="M422 166 C 502 122, 542 98, 612 92" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
         <text x="516" y="110" text-anchor="middle" font-size="12" fill="#9aa7b4">сети РФ, напрямую</text>
-        <rect x="616" y="58" width="180" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="616" y="58" width="180" height="66" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="706" y="86" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Российские сайты</text>
         <text x="706" y="105" text-anchor="middle" font-size="12" fill="#9aa7b4">видят российский IP</text>
         <path d="M404 230 C 422 270, 442 287, 484 293" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
@@ -126,7 +131,7 @@
         <text x="568" y="296" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Сервер-выход</text>
         <text x="568" y="315" text-anchor="middle" font-size="12" fill="#9aa7b4">за границей</text>
         <line x1="650" y1="301" x2="694" y2="301" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
-        <rect x="698" y="268" width="118" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="698" y="268" width="118" height="66" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="757" y="296" text-anchor="middle" font-size="13" font-weight="600" fill="#e6edf3">Зарубежные</text>
         <text x="757" y="314" text-anchor="middle" font-size="12" fill="#9aa7b4">чистый IP</text>
       </svg>
@@ -168,7 +173,7 @@
   <div class="wrap">
     <h2>На проверенной основе</h2>
     <p class="sub">Инструкция не набросок - маршрутизацию проверили вживую.</p>
-    <p>Каскад работает поверх двух обычных установок amneziawg-installer. В инструкции - идемпотентный скрипт маршрутизации и systemd-юнит, чтобы деление само поднималось после перезагрузки. Всё проверено на живом стенде из двух серверов: и сам сплит, и повторные запуски, и восстановление после ребута. Схему предложил в обсуждении сообщества @glfenix, полностью задокументирована в репозитории.</p>
+    <p>Маршрутизацию проверяли на живом стенде из двух серверов: и сам сплит, и повторные запуски скрипта, и восстановление после ребута. В инструкции лежит идемпотентный скрипт маршрутизации и systemd-юнит, чтобы деление поднималось само. Схему предложил @glfenix в обсуждении сообщества, а пошаговая инструкция лежит в репозитории.</p>
     <div class="cta-row">
       <a class="btn" href="https://github.com/bivlked/amneziawg-installer/discussions/120">Обсуждение #120</a>
     </div>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AmneziaWG 2.0: установка VPN на свой сервер одной командой</title>
-<meta name="description" content="Установка self-hosted AmneziaWG 2.0 VPN на чистый VPS с Ubuntu или Debian одной командой. Обход DPI, защита сервера и управление клиентами. Лицензия MIT.">
+<meta name="description" content="Одна команда превращает ваш VPS с Ubuntu или Debian в VPN-сервер AmneziaWG 2.0. Около двадцати минут, и в конце QR-код для телефона. Обход DPI, firewall настроен сразу, код открыт под MIT.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/">
@@ -42,6 +42,20 @@
   "license": "https://opensource.org/licenses/MIT",
   "codeRepository": "https://github.com/bivlked/amneziawg-installer",
   "url": "https://bivlked.github.io/amneziawg-installer/ru/",
+  "installUrl": "https://github.com/bivlked/amneziawg-installer/releases/latest",
+  "processorRequirements": "1 vCPU, amd64 или arm64",
+  "memoryRequirements": "512 МБ",
+  "storageRequirements": "5 ГБ",
+  "featureList": [
+    "Установка одной командой на чистый VPS с Ubuntu или Debian",
+    "Обфускация AmneziaWG 2.0: мусорные пакеты, маскировка заголовков H1-H4, паддинг S1-S4, пакеты сокрытия I1-I5",
+    "Firewall UFW, Fail2Ban, hardening через sysctl и лимит на SSH по умолчанию",
+    "Управление клиентами: добавление, удаление, список, перегенерация, QR-коды, vpn://-ссылки, гостевые конфиги с истечением",
+    "Вывод почти всех команд управления в JSON для скриптов и ботов",
+    "Готовые модули ядра ARM64 для Raspberry Pi, Hetzner CAX, Oracle Ampere A1 и AWS Graviton",
+    "Возобновление после перезагрузки и пересборка DKMS после обновления ядра"
+  ],
+  "sameAs": ["https://github.com/bivlked/amneziawg-installer"],
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "author": { "@type": "Person", "name": "bivlked" }
 }
@@ -67,6 +81,7 @@
     { "@type": "Question", "name": "Обходит ли DPI и блокировки?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 добавляет обфускацию поверх WireGuard и сопротивляется DPI, который применяют ТСПУ в России, а также в Иране, Китае и в школьных и корпоративных сетях. Гарантии против каждого оператора нет, но протокол даёт настройки обфускации, которые проходят сегодня." } },
     { "@type": "Question", "name": "Работает ли на ARM и Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Готовые модули ARM64 покрывают Raspberry Pi 3, 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный." } },
     { "@type": "Question", "name": "Как обновиться на новую версию?", "acceptedAnswer": { "@type": "Answer", "text": "Скачайте скрипт нового релиза на тот же сервер и запустите его с флагом --force. Ключи сервера, клиенты и настройки обфускации переживают переустановку. После обновления ядра модуль DKMS пересобирается автоматически при следующей загрузке." } },
+    { "@type": "Question", "name": "Можно ли управлять из скрипта или бота?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Почти все команды управления принимают --json и отвечают одним JSON-объектом даже тогда, когда команда завершилась ошибкой - разбирать ответ можно всегда. Исключения: list и stats отдают массив, а show и diagnose флага не понимают. Новые поля со временем появляются, существующие я не переименовываю. Для запусков без человека есть --yes, а с AWG_STRICT_CONFIRM=1 команда вроде удаления клиента откажется работать, если --yes забыли, вместо молчаливого согласия. На этом интерфейсе уже работает сторонний Telegram-бот awgram." } },
     { "@type": "Question", "name": "AmneziaWG не подключается, хотя обычный WireGuard работает?", "acceptedAnswer": { "@type": "Answer", "text": "Чаще всего это рассинхрон обфускации или версий, а не сеть. Если на том же сервере обычный WireGuard поднимается, а AmneziaWG нет, сверьте на сервере и клиенте параметры секции [Interface]: Jc/Jmin/Jmax, S1-S4, H1-H4 и, в версии 2.0, I1-I5. Все значения должны совпадать байт в байт, а I1-I5 ещё и чувствительны к регистру (только верхний); если I1 задан на одной стороне, но отсутствует на другой, сторона без него откатывается в режим 1.0 и handshake молча не проходит. Сверьте и версии: старые сборки amneziawg-tools не понимают 2.0. Полный разбор - в подробном руководстве по диагностике." } }
   ]
 }
@@ -112,12 +127,12 @@
       <span>Ubuntu и Debian</span>
       <span>x86_64 и ARM64</span>
       <span>Без зависимостей в рантайме</span>
-      <span>800+ автотестов</span>
+      <span>1100+ автотестов</span>
     </div>
     <figure class="hero-art" aria-hidden="true">
       <svg viewBox="0 0 760 132" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
         <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
-        <rect x="14" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="14" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="104" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Ваше устройство</text>
         <text x="104" y="87" text-anchor="middle" font-size="12" fill="#9aa7b4">одно приложение</text>
         <line x1="198" y1="71" x2="288" y2="71" stroke="#3ddc97" stroke-width="2" marker-end="url(#ar)"/>
@@ -128,7 +143,7 @@
         <text x="380" y="102" text-anchor="middle" font-size="12" fill="#9aa7b4">модуль ядра, защищён</text>
         <line x1="472" y1="71" x2="562" y2="71" stroke="#3ddc97" stroke-width="2" marker-end="url(#ar)"/>
         <text x="517" y="60" text-anchor="middle" font-size="11.5" fill="#9aa7b4">обход DPI</text>
-        <rect x="566" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="566" y="42" width="180" height="58" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <circle cx="600" cy="71" r="13" fill="none" stroke="#3ddc97" stroke-width="1.6"/>
         <path d="M587 71h26M600 58c6 4 6 22 0 26M600 58c-6 4-6 22 0 26" fill="none" stroke="#3ddc97" stroke-width="1.2"/>
         <text x="660" y="68" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Интернет</text>
@@ -157,6 +172,8 @@
       <div class="card"><div class="ico" aria-hidden="true">&#127760;</div><h3>IPv6 dual-stack</h3><p>Опциональная двухстековая маршрутизация, по умолчанию выключена и включается одним флагом, когда нужно.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128421;</div><h3>ARM и Raspberry Pi</h3><p>Готовые модули ядра для Raspberry Pi 3, 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton.</p></div>
       <div class="card"><div class="ico" aria-hidden="true">&#128260;</div><h3>Переживает перезагрузки</h3><p>Машина состояний с возобновлением после ребута и авто-починка DKMS, которая пересобирает модуль после обновления ядра.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#129302;</div><h3>Понимает скрипты и ботов</h3><p>Почти все команды управления понимают <code>--json</code> и отвечают одним объектом даже при сбое (<code>list</code> и <code>stats</code> отдают массив). На этом уже работает сторонний Telegram-бот.</p></div>
+      <div class="card"><div class="ico" aria-hidden="true">&#128225;</div><h3>Мобильные операторы</h3><p>Флаг <code>--mobile</code> включает профиль под сотовые сети и, если порт не задан явно, берёт 443/udp: нестандартные UDP-порты у операторов часто не проходят.</p></div>
     </div>
   </div>
 </section>
@@ -227,6 +244,7 @@
       <details><summary>Обходит ли DPI и блокировки?</summary><div class="answer">AmneziaWG 2.0 добавляет обфускацию поверх WireGuard и сопротивляется DPI, который применяют ТСПУ в России, а также в Иране, Китае и в школьных и корпоративных сетях. Гарантии против каждого оператора нет, но протокол даёт настройки обфускации, которые проходят сегодня.</div></details>
       <details><summary>Работает ли на ARM и Raspberry Pi?</summary><div class="answer">Да. Готовые модули ARM64 покрывают Raspberry Pi 3, 4 и 5, Hetzner CAX, Oracle Ampere A1 и AWS Graviton. Та же команда выберет нужный.</div></details>
       <details><summary>Как обновиться на новую версию?</summary><div class="answer">Скачайте скрипт нового релиза на тот же сервер и запустите его с флагом <code>--force</code>. Ключи сервера, клиенты и настройки обфускации переживают переустановку. После обновления ядра модуль DKMS пересобирается автоматически при следующей загрузке.</div></details>
+      <details><summary>Можно ли управлять из скрипта или бота?</summary><div class="answer">Да. Почти все команды управления принимают <code>--json</code> и отвечают одним JSON-объектом даже тогда, когда команда завершилась ошибкой - разбирать ответ можно всегда. Исключения: <code>list</code> и <code>stats</code> отдают массив, а <code>show</code> и <code>diagnose</code> флага не понимают. Новые поля со временем появляются, существующие я не переименовываю. Для запусков без человека есть <code>--yes</code>, а с <code>AWG_STRICT_CONFIRM=1</code> команда вроде удаления клиента откажется работать, если <code>--yes</code> забыли, вместо молчаливого согласия. На этом интерфейсе уже работает сторонний Telegram-бот <a href="https://github.com/ekuraev/awgram">awgram</a>.</div></details>
       <details><summary>AmneziaWG не подключается, хотя обычный WireGuard работает?</summary><div class="answer">Чаще всего это рассинхрон обфускации или версий, а не сеть. Если на том же сервере обычный WireGuard поднимается, а AmneziaWG нет, сверьте на сервере и клиенте параметры секции <code>[Interface]</code>: Jc/Jmin/Jmax, S1-S4, H1-H4 и, в версии 2.0, I1-I5. Все значения должны совпадать байт в байт, а I1-I5 ещё и чувствительны к регистру (только верхний); если I1 задан на одной стороне, но отсутствует на другой, сторона без него откатывается в режим 1.0 и handshake молча не проходит. Сверьте и версии: старые сборки amneziawg-tools не понимают 2.0. Полный разбор - в <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.md#troubleshooting-adv">подробном руководстве по диагностике</a>.</div></details>
     </div>
   </div>

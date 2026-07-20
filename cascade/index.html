@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Two-server cascade VPN: Russian traffic direct, the rest abroad</title>
-<meta name="description" content="A two-server cascade (double VPN) on AmneziaWG: Russian traffic exits directly from a Russian IP, everything else goes through a foreign exit server. Split on the server.">
+<meta name="description" content="A two-server cascade (double VPN) on AmneziaWG: Russian sites open from a Russian IP, everything else leaves through a foreign exit. Takes two VPS; the split lives on the server.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/cascade/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/cascade/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/cascade/">
@@ -63,7 +63,7 @@
   "inLanguage": "en",
   "image": "https://bivlked.github.io/amneziawg-installer/assets/og-cascade.png",
   "datePublished": "2026-06-15",
-  "dateModified": "2026-06-30",
+  "dateModified": "2026-07-20",
   "author": { "@type": "Person", "name": "bivlked" },
   "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
   "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/cascade/",
@@ -97,6 +97,11 @@
       <a class="btn btn-primary" href="https://github.com/bivlked/amneziawg-installer/blob/main/CASCADE.en.md">Full step-by-step guide</a>
       <a class="btn" href="#how">How it works</a>
     </div>
+    <div class="trust">
+      <span>Two VPS: one in Russia, one abroad</span>
+      <span>amneziawg-installer already on both</span>
+      <span>A real public IP on both, not behind NAT</span>
+    </div>
   </div>
 </section>
 
@@ -107,7 +112,7 @@
     <figure class="diagram">
       <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Traffic flow diagram: the client makes one connection to the entry server in Russia; Russian networks are sent out directly and seen from a Russian IP, while everything else is routed through a foreign exit server and seen from a foreign IP." font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
         <defs><marker id="cad" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
-        <rect x="24" y="150" width="150" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="24" y="150" width="150" height="66" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="99" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Client</text>
         <text x="99" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">one connection</text>
         <line x1="176" y1="183" x2="232" y2="183" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
@@ -117,7 +122,7 @@
         <text x="342" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">in Russia, holds the split</text>
         <path d="M422 166 C 502 122, 542 98, 612 92" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
         <text x="516" y="110" text-anchor="middle" font-size="12" fill="#9aa7b4">RU networks, direct</text>
-        <rect x="616" y="58" width="180" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="616" y="58" width="180" height="66" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="706" y="86" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Russian sites</text>
         <text x="706" y="105" text-anchor="middle" font-size="12" fill="#9aa7b4">seen from a Russian IP</text>
         <path d="M404 230 C 422 270, 442 287, 484 293" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
@@ -126,7 +131,7 @@
         <text x="568" y="296" text-anchor="middle" font-size="14.5" font-weight="600" fill="#e6edf3">Exit server</text>
         <text x="568" y="315" text-anchor="middle" font-size="12" fill="#9aa7b4">abroad</text>
         <line x1="650" y1="301" x2="694" y2="301" stroke="#3ddc97" stroke-width="2" marker-end="url(#cad)"/>
-        <rect x="698" y="268" width="118" height="66" rx="12" fill="#1b222c" stroke="#2a323d"/>
+        <rect x="698" y="268" width="118" height="66" rx="12" fill="#1b222c" stroke="#4a5563"/>
         <text x="757" y="296" text-anchor="middle" font-size="13.5" font-weight="600" fill="#e6edf3">Foreign</text>
         <text x="757" y="314" text-anchor="middle" font-size="12" fill="#9aa7b4">clean exit IP</text>
       </svg>
@@ -168,7 +173,7 @@
   <div class="wrap">
     <h2>Built on a verified setup</h2>
     <p class="sub">The guide is not a sketch - the routing was tested end to end.</p>
-    <p>The cascade runs on top of two normal amneziawg-installer installs. The guide ships an idempotent routing script and a systemd unit so the split comes back by itself after a reboot. It was checked on a live two-server stand: the split routing, repeated runs, and reboot persistence all hold. The scheme is based on a community show-and-tell by @glfenix and is documented in full in the repository.</p>
+    <p>The routing was checked on a live two-server stand: the split itself, repeated runs of the script, and recovery after a reboot. The guide ships an idempotent routing script and a systemd unit so the split comes back on its own. @glfenix proposed the scheme in a community discussion, and the step-by-step guide lives in the repository.</p>
     <div class="cta-row">
       <a class="btn" href="https://github.com/bivlked/amneziawg-installer/discussions/120">Discussion #120</a>
     </div>
