@@ -63,7 +63,7 @@
   "inLanguage": "en",
   "image": "https://bivlked.github.io/amneziawg-installer/assets/og-compare.png",
   "datePublished": "2026-06-15",
-  "dateModified": "2026-07-20",
+  "dateModified": "2026-07-26",
   "author": { "@type": "Person", "name": "bivlked" },
   "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
   "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/compare/",
@@ -176,7 +176,7 @@
   <div class="wrap">
     <h2>FAQ</h2>
     <div class="faq">
-      <details><summary>How does it differ from the official Amnezia app?</summary><div class="answer">Both run the same AmneziaWG 2.0 protocol. The official app is a GUI that deploys the server side in Docker over SSH. This installer skips Docker and runs AmneziaWG as a kernel module, then tunes and hardens the whole server for a single-purpose VPN - lower overhead, a smaller attack surface, and fine control over the obfuscation.</div></details>
+      <details><summary>How does amneziawg-installer differ from the official Amnezia app?</summary><div class="answer">Both run the same AmneziaWG 2.0 protocol. The official app is a GUI that deploys the server side in Docker over SSH. This installer skips Docker and runs AmneziaWG as a kernel module, then tunes and hardens the whole server for a single-purpose VPN - lower overhead, a smaller attack surface, and fine control over the obfuscation.</div></details>
       <details><summary>Does it use Docker on the server?</summary><div class="answer">No. It installs AmneziaWG as a kernel module through DKMS, so there is no Docker daemon or container stack running in the background. That keeps RAM and CPU use low, which matters most on a cheap VPS but helps on any server.</div></details>
       <details><summary>Does it optimize the server itself?</summary><div class="answer">Yes. The script reads the server's RAM and network card, then tunes sysctl buffers, swap size, and NIC offloads and enables BBR. It also strips unneeded packages and services so the box does one job. The container-based official app deploys its containers and does not do this kind of host-wide tuning and hardening.</div></details>
       <details><summary>Can I tune the obfuscation for my carrier or network?</summary><div class="answer">Yes. There is a mobile-network preset, direct access to the AmneziaWG 2.0 parameters, and field data on DPI behaviour, so you can tune the obfuscation for a specific operator or network.</div></details>
@@ -202,6 +202,12 @@
         <h3>Get started</h3>
         <p>One command turns a clean Ubuntu or Debian VPS into a working AmneziaWG 2.0 server.</p>
         <a class="go" href="/amneziawg-installer/#quick-start">Quick start &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128736;&#65039;</div>
+        <h3>Managing clients</h3>
+        <p>Add, remove and regenerate clients from the command line, with JSON output for scripts and bots.</p>
+        <a class="go" href="/amneziawg-installer/manage/">Client management &#8594;</a>
       </div>
     </div>
   </div>

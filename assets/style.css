@@ -218,3 +218,19 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .related .grid { margin-top: 4px; }
 .related .card h3 { display: flex; align-items: center; gap: 8px; }
 .related .card .go { color: var(--accent); font-weight: 600; font-size: 14px; margin-top: 10px; display: inline-block; }
+
+/* data tables (manage page). Прокрутка живёт ВНУТРИ обёртки: иначе на 390px
+   таблица растягивает всю страницу по горизонтали. */
+.tablewrap { overflow-x: auto; margin: 0 0 8px; }
+.dtable { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 620px; }
+.dtable th, .dtable td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.dtable th { background: var(--bg-soft); color: var(--text); font-size: 13px; text-transform: uppercase; letter-spacing: 0.4px; }
+.dtable td { color: var(--text-dim); }
+.dtable tr:last-child td { border-bottom: none; }
+.dtable code { background: var(--code-bg); padding: 2px 7px; border-radius: 5px; font-size: 14px; color: #cdd9e5; white-space: nowrap; }
+.dtable .y { color: var(--accent); font-weight: 600; }
+
+/* code block without a copy button: JSON примеры не запускают, их читают */
+.codeblock { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin: 0 0 14px; overflow-x: auto; }
+.codeblock pre { margin: 0; font-size: 14px; color: #cdd9e5; white-space: pre; }
+.codeblock .cap { margin: 0 0 10px; color: var(--text-dim); font-size: 13.5px; }

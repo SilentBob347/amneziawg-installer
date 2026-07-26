@@ -63,7 +63,7 @@
   "inLanguage": "ru",
   "image": "https://bivlked.github.io/amneziawg-installer/assets/og-compare-ru.png",
   "datePublished": "2026-06-15",
-  "dateModified": "2026-07-20",
+  "dateModified": "2026-07-26",
   "author": { "@type": "Person", "name": "bivlked" },
   "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
   "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/ru/compare/",
@@ -176,7 +176,7 @@
   <div class="wrap">
     <h2>Частые вопросы</h2>
     <div class="faq">
-      <details><summary>Чем он отличается от официального приложения Amnezia?</summary><div class="answer">Оба работают на одном протоколе AmneziaWG 2.0. Официальное приложение это GUI, который разворачивает серверную часть в Docker по SSH. Этот установщик обходится без Docker и ставит AmneziaWG модулем ядра, а затем оптимизирует и харднит весь сервер под одну задачу - меньше оверхеда, меньше поверхность атаки и тонкая настройка обфускации.</div></details>
+      <details><summary>Чем amneziawg-installer отличается от официального приложения Amnezia?</summary><div class="answer">Оба работают на одном протоколе AmneziaWG 2.0. Официальное приложение это GUI, который разворачивает серверную часть в Docker по SSH. Этот установщик обходится без Docker и ставит AmneziaWG модулем ядра, а затем оптимизирует и харднит весь сервер под одну задачу - меньше оверхеда, меньше поверхность атаки и тонкая настройка обфускации.</div></details>
       <details><summary>Использует ли он Docker на сервере?</summary><div class="answer">Нет. AmneziaWG ставится модулем ядра через DKMS, поэтому в фоне не работает ни Docker-демон, ни стек контейнеров. Это держит расход RAM и CPU низким - что особенно важно на дешёвом VPS, но полезно на любом сервере.</div></details>
       <details><summary>Оптимизирует ли он сам сервер?</summary><div class="answer">Да. Скрипт определяет RAM и сетевую карту, затем настраивает sysctl-буферы, размер swap и офлоады NIC и включает BBR. Ещё он вырезает лишние пакеты и службы, чтобы сервер делал одну задачу. Официальное приложение разворачивает контейнеры и сам сервер не оптимизирует и не настраивает.</div></details>
       <details><summary>Можно ли подстроить обфускацию под оператора или сеть?</summary><div class="answer">Да. Есть пресет для мобильных сетей, прямой доступ к параметрам AmneziaWG 2.0 и полевые данные по поведению DPI, так что обфускацию можно подстроить под конкретного оператора или сеть.</div></details>
@@ -202,6 +202,12 @@
         <h3>Начать</h3>
         <p>Одна команда превращает чистый VPS с Ubuntu или Debian в рабочий сервер AmneziaWG 2.0.</p>
         <a class="go" href="/amneziawg-installer/ru/#quick-start">Быстрый старт &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128736;&#65039;</div>
+        <h3>Управление клиентами</h3>
+        <p>Добавление, удаление и перевыпуск клиентов из командной строки, с выводом в JSON для скриптов и ботов.</p>
+        <a class="go" href="/amneziawg-installer/ru/manage/">Управление клиентами &#8594;</a>
       </div>
     </div>
   </div>

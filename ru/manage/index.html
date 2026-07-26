@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как добавлять и удалять клиентов AmneziaWG на своём сервере</title>
+<meta name="description" content="manage_amneziawg.sh добавляет, удаляет, перевыпускает и перечисляет клиентов AmneziaWG 2.0 из командной строки: QR-коды, vpn://-ссылки, доступ с истечением срока, бэкапы и вывод в JSON для скриптов и ботов.">
+<link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/manage/">
+<link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/manage/">
+<link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/manage/">
+<link rel="alternate" hreflang="x-default" href="https://bivlked.github.io/amneziawg-installer/manage/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Как добавлять и удалять клиентов AmneziaWG на своём сервере">
+<meta property="og:description" content="Один скрипт управляет клиентами AmneziaWG 2.0: добавить, удалить, перевыпустить, QR-код, доступ на время и вывод в JSON для ботов. Веб-панель не нужна.">
+<meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/ru/manage/">
+<meta property="og:site_name" content="amneziawg-installer">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-manage-ru.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Управление клиентами AmneziaWG из командной строки">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-manage-ru.png">
+<meta name="twitter:title" content="Как добавлять и удалять клиентов AmneziaWG на своём сервере">
+<meta name="twitter:description" content="Добавление, удаление и перевыпуск клиентов AmneziaWG 2.0 из командной строки, с выводом в JSON для скриптов и ботов.">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../../assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Нужна ли веб-панель, чтобы управлять клиентами AmneziaWG?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Вместе с установщиком на сервер ставится manage_amneziawg.sh: он добавляет, удаляет, перевыпускает и перечисляет клиентов одной командой по SSH, а для скриптов и ботов отдаёт машиночитаемый JSON. Панель оправдана только если вы постоянно заводите и меняете клиентов." } },
+    { "@type": "Question", "name": "Как добавить клиента на сервер AmneziaWG?", "acceptedAnswer": { "@type": "Answer", "text": "Командой 'sudo bash /root/awg/manage_amneziawg.sh add phone'. Скрипт сам сгенерирует ключи, запишет конфиг клиента, нарисует QR-код и vpn://-ссылку для импорта в приложение Amnezia одним касанием и применит изменение на работающем интерфейсе. Имён можно передать несколько сразу: 'add phone laptop tablet'." } },
+    { "@type": "Question", "name": "Как удалить клиента и отозвать доступ?", "acceptedAnswer": { "@type": "Answer", "text": "Командой 'sudo bash /root/awg/manage_amneziawg.sh remove phone'. Ключ клиента убирается из конфигурации сервера и изменение применяется на работающем интерфейсе, поэтому старый конфиг перестаёт подключаться сразу и перевыпускать ничего не нужно. Имён тоже можно передать несколько: 'remove phone laptop'." } },
+    { "@type": "Question", "name": "Можно ли выдать доступ на время?", "acceptedAnswer": { "@type": "Answer", "text": "Да. Команда 'add guest --expires=7d' создаёт клиента, который перестанет работать через указанный срок. Срок пишется как Nh, Nd или Nw: 12h, 7d, 4w. Просроченных клиентов снимает cron, проверка идёт каждые пять минут, вручную чистить ничего не нужно." } },
+    { "@type": "Question", "name": "Можно ли управлять сервером из скрипта или бота?", "acceptedAnswer": { "@type": "Answer", "text": "Да, через флаг --json. Команды управления отвечают ровно одним JSON-документом на stdout, в том числе когда падают, а человеческие сообщения уходят в stderr. Команды list и stats вместо объекта отдают массив, а show и diagnose флага не понимают. На этом интерфейсе уже работает сторонний телеграм-бот awgram." } },
+    { "@type": "Question", "name": "Что вернёт команда, если она завершилась ошибкой?", "acceptedAnswer": { "@type": "Answer", "text": "Зависит от того, как именно она упала. Аварийный выход (падение, неверная опция, отказ от подтверждения) даёт ok:false, человекочитаемый error и rc. А пакетная команда вроде add вместо этого расписывает исход по каждому имени внутри results[] и ставит ok:false, поля rc там нет. Источник истины - код возврата процесса, ok его дублирует. Текст ошибки не парсить: решения принимать по ok, rc и status." } },
+    { "@type": "Question", "name": "Сервер обновил ядро, и туннель перестал работать. Что делать?", "acceptedAnswer": { "@type": "Answer", "text": "Выполнить 'manage_amneziawg.sh repair-module'. Команда пересобирает модуль ядра через DKMS, загружает его и заново поднимает сервис, так что обновление ядра не означает переустановку." } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "amneziawg-installer", "item": "https://bivlked.github.io/amneziawg-installer/ru/" },
+    { "@type": "ListItem", "position": 2, "name": "Управление клиентами", "item": "https://bivlked.github.io/amneziawg-installer/ru/manage/" }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Управление клиентами AmneziaWG из командной строки",
+  "description": "Все команды управления amneziawg-installer: добавление, удаление, список, перевыпуск, изменение, бэкап, восстановление, проверка, диагностика, перезапуск и починка модуля, плюс интерфейс JSON для скриптов и ботов.",
+  "inLanguage": "ru",
+  "image": "https://bivlked.github.io/amneziawg-installer/assets/og-manage-ru.png",
+  "datePublished": "2026-07-26",
+  "dateModified": "2026-07-26",
+  "author": { "@type": "Person", "name": "bivlked" },
+  "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
+  "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/ru/manage/",
+  "isPartOf": "https://bivlked.github.io/amneziawg-installer/ru/"
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">К содержимому</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/amneziawg-installer/ru/">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3ddc97"/><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/></svg>
+      amneziawg-installer
+    </a>
+    <nav class="nav-right" aria-label="Навигация по сайту">
+      <span class="lang-switch"><a aria-label="English" href="/amneziawg-installer/manage/">EN</a><a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/manage/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Звезда на GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <h1>Управление клиентами AmneziaWG из командной строки</h1>
+    <p class="lede">amneziawg-installer ставит AmneziaWG 2.0 на Ubuntu и Debian. Клиентами дальше занимается скрипт <code>manage_amneziawg.sh</code>: завести, удалить, перевыпустить конфиг, выдать QR-код или <code>vpn://</code>-ссылку. Он же показывает статистику, делает бэкапы и чинит модуль ядра после обновления. Всё это одной командой по SSH, а для скриптов и ботов есть вывод в JSON.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#commands">Все команды</a>
+      <a class="btn" href="#json">JSON для ботов</a>
+    </div>
+  </div>
+</section>
+
+<section id="recipes">
+  <div class="wrap">
+    <h2>Типовые задачи</h2>
+    <p class="sub">Ниже только подкоманды, полный вызов выглядит так: <code>sudo bash /root/awg/manage_amneziawg.sh &lt;команда&gt;</code>.</p>
+    <div class="tablewrap">
+      <table class="dtable">
+        <thead><tr><th>Задача</th><th>Команда</th></tr></thead>
+        <tbody>
+          <tr><td>Завести телефон и получить QR-код</td><td><code>add phone</code></td></tr>
+          <tr><td>Добавить три устройства разом</td><td><code>add phone laptop tablet</code></td></tr>
+          <tr><td>Дать гостю доступ на неделю</td><td><code>add guest --expires=7d</code></td></tr>
+          <tr><td>Отозвать доступ</td><td><code>remove guest</code></td></tr>
+          <tr><td>Посмотреть, кто подключён и сколько скачал</td><td><code>stats</code></td></tr>
+          <tr><td>Перевыпустить конфиг после потери телефона</td><td><code>regen phone</code></td></tr>
+          <tr><td>Сделать бэкап перед любыми правками</td><td><code>backup</code></td></tr>
+          <tr><td>Вернуть туннель после обновления ядра</td><td><code>repair-module</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<section id="commands">
+  <div class="wrap">
+    <h2>Все команды одной таблицей</h2>
+    <p class="sub">Установщик кладёт скрипт на сервер сам, запускать его нужно от root. Столбец JSON показывает, что вернёт флаг <code>--json</code>.</p>
+    <div class="tablewrap">
+      <table class="dtable">
+        <thead><tr><th>Команда</th><th>Что делает</th><th>JSON</th></tr></thead>
+        <tbody>
+          <tr><td><code>add &lt;имя&gt; [имя2 ...]</code></td><td>Заводит клиента: ключи, конфиг, QR-код и <code>vpn://</code>-ссылка. Имён можно несколько сразу. <code>--expires=</code> выдаёт доступ на время, <code>--psk</code> добавляет PresharedKey.</td><td class="y">объект</td></tr>
+          <tr><td><code>remove &lt;имя&gt; [имя2 ...]</code></td><td>Удаляет клиента и отзывает доступ. Имён можно несколько сразу.</td><td class="y">объект</td></tr>
+          <tr><td><code>list</code></td><td>Список клиентов. С <code>-v</code> подробнее; в JSON-виде есть ещё адрес IPv6 и машинный статус.</td><td class="y">массив</td></tr>
+          <tr><td><code>stats</code></td><td>Трафик по каждому клиенту и время последнего хендшейка.</td><td class="y">массив</td></tr>
+          <tr><td><code>regen [имя ...]</code></td><td>Перевыпускает файлы клиента, сохраняя ключи и адрес. <code>--reset-routes</code> сбрасывает маршрутизацию к текущему режиму.</td><td class="y">объект</td></tr>
+          <tr><td><code>modify &lt;имя&gt; &lt;параметр&gt; &lt;значение&gt;</code></td><td>Меняет отдельный параметр клиента.</td><td class="y">объект</td></tr>
+          <tr><td><code>backup</code></td><td>Создаёт резервную копию конфигурации сервера и набора клиентов.</td><td class="y">объект</td></tr>
+          <tr><td><code>restore [файл]</code></td><td>Восстанавливает из копии и сообщает, был ли откат.</td><td class="y">объект</td></tr>
+          <tr><td><code>check</code></td><td>Состояние сервера: модуль, сервис, порт, файрвол. Алиас: <code>status</code>.</td><td class="y">объект</td></tr>
+          <tr><td><code>diagnose</code></td><td>Самодиагностика: ядро, sysctl и UFW, а с <code>--carrier=</code> ещё и сверка обфускации с профилем мобильного оператора.</td><td>только текст</td></tr>
+          <tr><td><code>show</code></td><td>Сырой вывод <code>awg show</code>.</td><td>только текст</td></tr>
+          <tr><td><code>restart</code></td><td>Перезапускает сервис AmneziaWG.</td><td class="y">объект</td></tr>
+          <tr><td><code>repair-module</code></td><td>Пересобирает модуль ядра после обновления ядра и возвращает туннель. Алиас: <code>repair</code>.</td><td class="y">объект</td></tr>
+          <tr><td><code>help</code></td><td>Полная справка со всеми флагами.</td><td>только текст</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="inline-note">Срок для временного доступа пишется как <code>Nh</code>, <code>Nd</code> или <code>Nw</code>: <code>12h</code>, <code>7d</code>, <code>4w</code>. Cron проверяет сроки каждые пять минут и снимает просроченных, вручную чистить ничего не нужно.</p>
+  </div>
+</section>
+
+<section id="json">
+  <div class="wrap">
+    <h2>Машинный вывод для скриптов и ботов</h2>
+    <p class="sub">Начиная с v5.21.0 команды управления понимают <code>--json</code>. Флаг нужен ровно для того, чтобы боту не приходилось разбирать человеческий текст и гадать, сработала команда или нет.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128230;</div>
+        <h3>Ровно один JSON-документ</h3>
+        <p>У команды, которая понимает флаг, на stdout приходит ровно один JSON-документ за запуск, при любом исходе, включая аварийное завершение и отказ от подтверждения. Команды с конвертом отдают объект, <code>list</code> и <code>stats</code> - голый массив. Человеческие сообщения уходят в stderr, потоки не смешиваются.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9989;</div>
+        <h3>Источник истины - код возврата</h3>
+        <p>Поле <code>ok</code> дублирует его для ботов, которые читают только stdout. Частичный отказ считается отказом: <code>add a b</code>, где <code>b</code> уже существует, вернёт <code>ok:false</code>.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128204;</div>
+        <h3>Схема только расширяется</h3>
+        <p>Новые поля со временем появляются, существующие не переименовываются и не меняют тип. <code>list</code> и <code>stats</code> остаются голыми массивами, какими и были.</p>
+      </div>
+      <div class="card lead">
+        <div class="ico" aria-hidden="true">&#128274;</div>
+        <h3>Подтверждение и неинтерактивный запуск</h3>
+        <p><code>--json</code> не подразумевает <code>--yes</code> - это независимые флаги. Но рассчитывать на подтверждение как на защиту нельзя: когда терминала нет, спросить некого, и деструктивная команда выполняется молча. Чтобы такой запуск отклонялся, а не проходил, включайте <code>AWG_STRICT_CONFIRM=1</code> - тогда <code>remove</code> без <code>--yes</code> вернёт отказ с <code>rc 1</code>.</p>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="codeblock">
+        <p class="cap">Успешное выполнение <code>add</code>:</p>
+        <pre>{"command":"add","ok":true,"added":1,"failed":0,"applied":true,
+ "results":[{"name":"phone","status":"created","conf":"/root/awg/phone.conf",
+             "qr":"/root/awg/phone.png","vpnuri":"/root/awg/phone.vpnuri","expires_at":null}]}</pre>
+      </div>
+      <div class="codeblock">
+        <p class="cap">Любой сбой, включая прерванное подтверждение:</p>
+        <pre>{"command":"remove","ok":false,"error":"confirmation denied","rc":1}</pre>
+      </div>
+      <p class="inline-note">Поле <code>error</code> - человекочитаемый текст, он бывает локализован. Машинные решения принимаются по <code>ok</code>, <code>rc</code> и <code>status</code>. Две ловушки. Первая: <code>repair-module.rc</code> - это внутренний код проверки модуля, а не код возврата процесса. Вторая: ошибка в аргументах тоже приходит конвертом, и в поле <code>command</code> окажется либо <code>help</code>, либо сама неизвестная команда, а не одно из 14 канонических имён. Алиасы приводятся к канону: в ответе всегда <code>check</code> и <code>repair-module</code>, как бы команду ни набрали.</p>
+    </div>
+    <h3 class="mt">Машинные статусы клиента</h3>
+    <p class="sub">Поле <code>status_code</code> есть и в <code>list --json</code>, и в <code>stats --json</code>. В отличие от статуса для человека, эти значения не зависят от языка скрипта.</p>
+    <div class="tablewrap">
+      <table class="dtable">
+        <thead><tr><th>Значение</th><th>Что означает</th></tr></thead>
+        <tbody>
+          <tr><td><code>active</code></td><td>Хендшейк был меньше 3 минут назад.</td></tr>
+          <tr><td><code>recent</code></td><td>Хендшейк был в пределах суток.</td></tr>
+          <tr><td><code>inactive</code></td><td>Хендшейка нет или он устарел (в stats).</td></tr>
+          <tr><td><code>no_handshake</code></td><td>Хендшейка нет или он устарел (в list).</td></tr>
+          <tr><td><code>key_error</code></td><td>Ключа клиента нет в конфигурации сервера.</td></tr>
+          <tr><td><code>no_data</code></td><td>Данных недостаточно, чтобы судить.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="inline-note"><a href="https://github.com/ekuraev/awgram">awgram</a>, сторонний телеграм-бот на Rust, ходит ровно через этот интерфейс: заводит и удаляет клиентов, читает статистику, делает бэкапы. Полное описание контракта - в <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.md#json-api-adv">ADVANCED.md</a>.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Частые вопросы</h2>
+    <div class="faq">
+      <details><summary>Нужна ли веб-панель, чтобы управлять клиентами AmneziaWG?</summary><div class="answer">Нет. Вместе с установщиком ставится <code>manage_amneziawg.sh</code>: он добавляет, удаляет, перевыпускает и перечисляет клиентов одной командой по SSH, а для скриптов и ботов отдаёт машиночитаемый JSON. Панель оправдана, только если вы постоянно заводите и меняете клиентов; для сервера, который настроили один раз и забыли, это ещё одна деталь, которую придётся обновлять.</div></details>
+      <details><summary>Как добавить клиента на сервер AmneziaWG?</summary><div class="answer"><code>sudo bash /root/awg/manage_amneziawg.sh add phone</code>. Скрипт сам сгенерирует ключи, запишет конфиг, нарисует QR-код и <code>vpn://</code>-ссылку для импорта в приложение Amnezia одним касанием и применит изменение на работающем интерфейсе. Имён можно передать несколько сразу: <code>add phone laptop tablet</code>.</div></details>
+      <details><summary>Как удалить клиента и отозвать доступ?</summary><div class="answer"><code>sudo bash /root/awg/manage_amneziawg.sh remove phone</code>. Ключ клиента убирается из конфигурации сервера, изменение применяется на работающем интерфейсе, поэтому старый конфиг перестаёт подключаться сразу и перевыпускать ничего не нужно. Имён тоже можно передать несколько: <code>remove phone laptop</code>.</div></details>
+      <details><summary>Можно ли выдать доступ на время?</summary><div class="answer">Да. <code>add guest --expires=7d</code> создаёт клиента, который перестанет работать через указанный срок. Срок пишется как <code>Nh</code>, <code>Nd</code> или <code>Nw</code>: <code>12h</code>, <code>7d</code>, <code>4w</code>. Просроченных снимает cron, проверка идёт каждые пять минут.</div></details>
+      <details><summary>Можно ли управлять сервером из скрипта или бота?</summary><div class="answer">Да, через <code>--json</code>. Команды управления отвечают ровно одним JSON-документом на stdout, в том числе когда падают, а человеческие сообщения уходят в stderr. <code>list</code> и <code>stats</code> вместо объекта отдают массив, а <code>show</code> и <code>diagnose</code> флага не понимают. На этом интерфейсе уже работает сторонний телеграм-бот <a href="https://github.com/ekuraev/awgram">awgram</a>.</div></details>
+      <details><summary>Что вернёт команда, если она завершилась ошибкой?</summary><div class="answer">Зависит от того, как именно она упала. Аварийный выход (падение, неверная опция, отказ от подтверждения) даёт <code>ok:false</code>, человекочитаемый <code>error</code> и <code>rc</code>. А пакетная команда вроде <code>add</code> вместо этого расписывает исход по каждому имени внутри <code>results[]</code> и ставит <code>ok:false</code>, поля <code>rc</code> там нет. Источник истины - код возврата процесса, <code>ok</code> его дублирует. Текст ошибки не парсить: решения принимать по <code>ok</code>, <code>rc</code> и <code>status</code>.</div></details>
+      <details><summary>Сервер обновил ядро, и туннель перестал работать. Что делать?</summary><div class="answer"><code>repair-module</code> пересобирает модуль ядра через DKMS, загружает его и заново поднимает сервис. Обновление ядра не означает переустановку.</div></details>
+    </div>
+  </div>
+</section>
+
+<section id="related" class="related">
+  <div class="wrap">
+    <h2>Смотрите также</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9878;&#65039;</div>
+        <h3>Сравнение с приложением Amnezia</h3>
+        <p>Тот же протокол AmneziaWG 2.0, но иначе: без Docker, весь сервер оптимизирован и защищён.</p>
+        <a class="go" href="/amneziawg-installer/ru/compare/">Чем отличается &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128279;</div>
+        <h3>Каскад из двух серверов</h3>
+        <p>Российский трафик уходит напрямую с российского IP, остальное - через зарубежный выход.</p>
+        <a class="go" href="/amneziawg-installer/ru/cascade/">Настройка каскада &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128640;</div>
+        <h3>Начать</h3>
+        <p>Одна команда превращает чистый VPS на Ubuntu или Debian в рабочий сервер AmneziaWG 2.0.</p>
+        <a class="go" href="/amneziawg-installer/ru/#quick-start">Быстрый старт &#8594;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="foot-links">
+          <a href="/amneziawg-installer/ru/">Главная</a>
+          <a href="https://github.com/bivlked/amneziawg-installer">Репозиторий</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Гайд по установке</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.md">Расширенно</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CHANGELOG.md">Изменения</a>
+          <a href="https://github.com/bivlked/amneziawg-installer#similar-tools">Похожие инструменты</a>
+        </div>
+        <p class="note">Открытый код под лицензией MIT. Если проект помог, звезда на GitHub поможет другим его найти.</p>
+      </div>
+      <div class="lang-switch"><a aria-label="English" href="/amneziawg-installer/manage/">EN</a> <a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/manage/">RU</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

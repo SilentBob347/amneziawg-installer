@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to add and remove AmneziaWG clients on your own server</title>
+<meta name="description" content="manage_amneziawg.sh adds, removes, regenerates and lists AmneziaWG 2.0 clients from the command line: QR codes, vpn:// links, time-limited access, backups and JSON output for scripts and bots.">
+<link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/manage/">
+<link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/manage/">
+<link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/manage/">
+<link rel="alternate" hreflang="x-default" href="https://bivlked.github.io/amneziawg-installer/manage/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to add and remove AmneziaWG clients on your own server">
+<meta property="og:description" content="One script manages AmneziaWG 2.0 clients: add, remove, regenerate, QR codes, time-limited access and JSON output for bots. No web panel needed.">
+<meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/manage/">
+<meta property="og:site_name" content="amneziawg-installer">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-manage.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Managing AmneziaWG clients from the command line">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-manage.png">
+<meta name="twitter:title" content="How to add and remove AmneziaWG clients on your own server">
+<meta name="twitter:description" content="Add, remove and regenerate AmneziaWG 2.0 clients from the command line, with JSON output for scripts and bots.">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Do I need a web panel to manage AmneziaWG clients?", "acceptedAnswer": { "@type": "Answer", "text": "No. amneziawg-installer ships manage_amneziawg.sh, which adds, removes, regenerates and lists clients from a single SSH command, and prints machine-readable JSON for scripts and bots. A panel is worth it only if you add and change clients constantly." } },
+    { "@type": "Question", "name": "How do I add a client to an AmneziaWG server?", "acceptedAnswer": { "@type": "Answer", "text": "Run 'sudo bash /root/awg/manage_amneziawg.sh add phone'. The script generates the keys, writes the client config, renders a QR code and a vpn:// link for one-tap import into the Amnezia app, and applies the change to the running interface. Several names can be passed at once: 'add phone laptop tablet'." } },
+    { "@type": "Question", "name": "How do I remove a client and revoke access?", "acceptedAnswer": { "@type": "Answer", "text": "Run 'sudo bash /root/awg/manage_amneziawg.sh remove phone'. The client key is dropped from the server config and the change is applied to the running interface, so the old config stops connecting right away and there is nothing to reissue. Several names work here too: 'remove phone laptop'." } },
+    { "@type": "Question", "name": "Can I give someone temporary access?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. 'add guest --expires=7d' creates a client that stops working after the given period. A duration is written as Nh, Nd or Nw: 12h, 7d, 4w. A cron job checks every five minutes and removes what has expired, so nothing has to be cleaned up by hand." } },
+    { "@type": "Question", "name": "Can I manage the server from a script or a bot?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, through the --json flag. Management commands reply with exactly one JSON document on stdout, including when they fail, and human messages go to stderr. list and stats return a plain array instead. show and diagnose do not take the flag. A third-party Telegram bot, awgram, already runs on this interface." } },
+    { "@type": "Question", "name": "What does a command return when it fails?", "acceptedAnswer": { "@type": "Answer", "text": "It depends on how it failed. An emergency exit (a crash, a bad option, a refused confirmation) returns ok:false with a human-readable error and rc. A batch command such as add instead reports the outcome per name inside results[] and sets ok:false, with no rc field. The process exit code is authoritative and ok mirrors it. Do not parse the error text: decide from ok, rc and status." } },
+    { "@type": "Question", "name": "The kernel was upgraded and the tunnel stopped working. What now?", "acceptedAnswer": { "@type": "Answer", "text": "Run 'manage_amneziawg.sh repair-module'. It rebuilds the kernel module through DKMS, loads it and starts the service again, so a kernel upgrade does not mean a reinstall." } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "amneziawg-installer", "item": "https://bivlked.github.io/amneziawg-installer/" },
+    { "@type": "ListItem", "position": 2, "name": "Managing clients", "item": "https://bivlked.github.io/amneziawg-installer/manage/" }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Managing AmneziaWG clients from the command line",
+  "description": "Every management command of amneziawg-installer: add, remove, list, regenerate, modify, backup, restore, check, diagnose, restart and repair, plus the JSON interface for scripts and bots.",
+  "inLanguage": "en",
+  "image": "https://bivlked.github.io/amneziawg-installer/assets/og-manage.png",
+  "datePublished": "2026-07-26",
+  "dateModified": "2026-07-26",
+  "author": { "@type": "Person", "name": "bivlked" },
+  "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
+  "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/manage/",
+  "isPartOf": "https://bivlked.github.io/amneziawg-installer/"
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/amneziawg-installer/">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3ddc97"/><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/></svg>
+      amneziawg-installer
+    </a>
+    <nav class="nav-right" aria-label="Site navigation">
+      <span class="lang-switch"><a class="active" aria-current="page" aria-label="English" href="/amneziawg-installer/manage/">EN</a><a aria-label="Русский" href="/amneziawg-installer/ru/manage/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Star on GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <h1>Managing AmneziaWG clients from the command line</h1>
+    <p class="lede">amneziawg-installer sets up AmneziaWG 2.0 on Ubuntu and Debian. From there <code>manage_amneziawg.sh</code> takes over the clients: add one, remove one, reissue a config, hand out a QR code or a <code>vpn://</code> link. The same script reports traffic, takes backups and repairs the kernel module after a kernel upgrade. All of it one command over SSH, with JSON output for scripts and bots.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#commands">All commands</a>
+      <a class="btn" href="#json">JSON for bots</a>
+    </div>
+  </div>
+</section>
+
+<section id="recipes">
+  <div class="wrap">
+    <h2>Typical tasks</h2>
+    <p class="sub">Only the subcommand is shown; the full call is <code>sudo bash /root/awg/manage_amneziawg.sh &lt;command&gt;</code>.</p>
+    <div class="tablewrap">
+      <table class="dtable">
+        <thead><tr><th>Task</th><th>Command</th></tr></thead>
+        <tbody>
+          <tr><td>Add a phone and get a QR code</td><td><code>add phone</code></td></tr>
+          <tr><td>Add three devices in one go</td><td><code>add phone laptop tablet</code></td></tr>
+          <tr><td>Give a guest access for a week</td><td><code>add guest --expires=7d</code></td></tr>
+          <tr><td>Revoke access</td><td><code>remove guest</code></td></tr>
+          <tr><td>See who is connected and how much they used</td><td><code>stats</code></td></tr>
+          <tr><td>Reissue a config after a lost phone</td><td><code>regen phone</code></td></tr>
+          <tr><td>Back up before touching anything</td><td><code>backup</code></td></tr>
+          <tr><td>Bring the tunnel back after a kernel upgrade</td><td><code>repair-module</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<section id="commands">
+  <div class="wrap">
+    <h2>Every command in one table</h2>
+    <p class="sub">The installer puts the script on the server for you; run it as root. The JSON column says what the <code>--json</code> flag returns.</p>
+    <div class="tablewrap">
+      <table class="dtable">
+        <thead><tr><th>Command</th><th>What it does</th><th>JSON</th></tr></thead>
+        <tbody>
+          <tr><td><code>add &lt;name&gt; [name2 ...]</code></td><td>Adds a client: keys, config, QR code and a <code>vpn://</code> link. Several names at once. <code>--expires=</code> for time-limited access, <code>--psk</code> for a PresharedKey.</td><td class="y">object</td></tr>
+          <tr><td><code>remove &lt;name&gt; [name2 ...]</code></td><td>Removes a client and revokes its access. Several names at once.</td><td class="y">object</td></tr>
+          <tr><td><code>list</code></td><td>Lists clients. <code>-v</code> adds detail; the JSON form also carries the IPv6 address and a machine-stable status.</td><td class="y">array</td></tr>
+          <tr><td><code>stats</code></td><td>Per-client traffic and last handshake.</td><td class="y">array</td></tr>
+          <tr><td><code>regen [name ...]</code></td><td>Regenerates the client files, keeping the keys and the address. <code>--reset-routes</code> resets the routing to the current mode.</td><td class="y">object</td></tr>
+          <tr><td><code>modify &lt;name&gt; &lt;param&gt; &lt;value&gt;</code></td><td>Changes a single client parameter.</td><td class="y">object</td></tr>
+          <tr><td><code>backup</code></td><td>Creates a backup of the server config and the client set.</td><td class="y">object</td></tr>
+          <tr><td><code>restore [file]</code></td><td>Restores from a backup and reports whether a rollback happened.</td><td class="y">object</td></tr>
+          <tr><td><code>check</code></td><td>Server health: module, service, port, firewall. Alias: <code>status</code>.</td><td class="y">object</td></tr>
+          <tr><td><code>diagnose</code></td><td>Self-troubleshooting: kernel, sysctl and UFW, plus <code>--carrier=</code> to compare the obfuscation against a mobile-carrier profile.</td><td>human only</td></tr>
+          <tr><td><code>show</code></td><td>Raw <code>awg show</code> output.</td><td>human only</td></tr>
+          <tr><td><code>restart</code></td><td>Restarts the AmneziaWG service.</td><td class="y">object</td></tr>
+          <tr><td><code>repair-module</code></td><td>Rebuilds the kernel module after a kernel upgrade and brings the tunnel back. Alias: <code>repair</code>.</td><td class="y">object</td></tr>
+          <tr><td><code>help</code></td><td>Full usage with every flag.</td><td>human only</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="inline-note">A time limit is written as <code>Nh</code>, <code>Nd</code> or <code>Nw</code>: <code>12h</code>, <code>7d</code>, <code>4w</code>. A cron job checks expiry every five minutes and removes what has expired, so nothing has to be cleaned up by hand.</p>
+  </div>
+</section>
+
+<section id="json">
+  <div class="wrap">
+    <h2>Machine-readable output for scripts and bots</h2>
+    <p class="sub">Since v5.21.0 the management commands take <code>--json</code>. It exists so that a bot never has to scrape human text or guess whether a command worked.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128230;</div>
+        <h3>Exactly one JSON document</h3>
+        <p>For a command that supports the flag, stdout carries exactly one JSON document per run, on every outcome including a crash or a refused confirmation. Envelope commands return an object, <code>list</code> and <code>stats</code> a bare array. Human messages go to stderr, so the two streams never mix.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9989;</div>
+        <h3>The exit code is the source of truth</h3>
+        <p>The <code>ok</code> field mirrors it for bots that only read stdout. A partial failure counts as a failure: <code>add a b</code> where <code>b</code> already exists returns <code>ok:false</code>.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128204;</div>
+        <h3>Compatibility is additive</h3>
+        <p>New fields may appear over time; existing ones are never renamed and never change type. <code>list</code> and <code>stats</code> stay bare arrays, as they always were.</p>
+      </div>
+      <div class="card lead">
+        <div class="ico" aria-hidden="true">&#128274;</div>
+        <h3>Confirmation and non-interactive runs</h3>
+        <p><code>--json</code> does not imply <code>--yes</code> - they are independent flags. But do not treat the prompt as a safety net: with no terminal there is nobody to ask, and a destructive command proceeds silently. To have such a run refused instead, set <code>AWG_STRICT_CONFIRM=1</code> - then <code>remove</code> without <code>--yes</code> returns a refusal with <code>rc 1</code>.</p>
+      </div>
+    </div>
+    <div class="mt">
+      <div class="codeblock">
+        <p class="cap">A successful <code>add</code>:</p>
+        <pre>{"command":"add","ok":true,"added":1,"failed":0,"applied":true,
+ "results":[{"name":"phone","status":"created","conf":"/root/awg/phone.conf",
+             "qr":"/root/awg/phone.png","vpnuri":"/root/awg/phone.vpnuri","expires_at":null}]}</pre>
+      </div>
+      <div class="codeblock">
+        <p class="cap">Any failure, including an aborted confirmation:</p>
+        <pre>{"command":"remove","ok":false,"error":"confirmation denied","rc":1}</pre>
+      </div>
+      <p class="inline-note">The <code>error</code> field is human-readable text and may be localized. In code, decide from <code>ok</code>, <code>rc</code> and <code>status</code> instead. Two traps. First, <code>repair-module.rc</code> is the internal module-check code, not the process exit code. Second, a usage error also comes back as an envelope, and <code>command</code> then holds either <code>help</code> or the unknown command itself rather than one of the 14 canonical names. Aliases are canonicalized: the reply always says <code>check</code> and <code>repair-module</code>, however the command was typed.</p>
+    </div>
+    <h3 class="mt">Client status codes</h3>
+    <p class="sub">The <code>status_code</code> field is present in both <code>list --json</code> and <code>stats --json</code>. Unlike the human-facing status, these values do not depend on the language of the script.</p>
+    <div class="tablewrap">
+      <table class="dtable">
+        <thead><tr><th>Value</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code>active</code></td><td>Handshake less than 3 minutes ago.</td></tr>
+          <tr><td><code>recent</code></td><td>Handshake within the last 24 hours.</td></tr>
+          <tr><td><code>inactive</code></td><td>No handshake, or a stale one (stats).</td></tr>
+          <tr><td><code>no_handshake</code></td><td>No handshake, or a stale one (list).</td></tr>
+          <tr><td><code>key_error</code></td><td>The client key is missing from the server config.</td></tr>
+          <tr><td><code>no_data</code></td><td>Not enough data to judge.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="inline-note"><a href="https://github.com/ekuraev/awgram">awgram</a>, a third-party Telegram bot written in Rust, goes through exactly this interface: it adds and removes clients, reads stats and triggers backups. The full contract lives in <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.en.md#json-api-adv">ADVANCED.en.md</a>.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>FAQ</h2>
+    <div class="faq">
+      <details><summary>Do I need a web panel to manage AmneziaWG clients?</summary><div class="answer">No. The installer ships <code>manage_amneziawg.sh</code>, which adds, removes, regenerates and lists clients from a single SSH command, and prints machine-readable JSON for scripts and bots. A panel is worth it only if you add and change clients constantly; for a server that is set up once and forgotten, it is one more moving part to keep patched.</div></details>
+      <details><summary>How do I add a client to an AmneziaWG server?</summary><div class="answer"><code>sudo bash /root/awg/manage_amneziawg.sh add phone</code>. The script generates the keys, writes the config, renders a QR code and a <code>vpn://</code> link for one-tap import into the Amnezia app, and applies the change to the running interface. Several names can be passed at once: <code>add phone laptop tablet</code>.</div></details>
+      <details><summary>How do I remove a client and revoke access?</summary><div class="answer"><code>sudo bash /root/awg/manage_amneziawg.sh remove phone</code>. The client key is dropped from the server config and the change is applied to the running interface, so the old config stops connecting right away and there is nothing to reissue. Several names work here too: <code>remove phone laptop</code>.</div></details>
+      <details><summary>Can I give someone temporary access?</summary><div class="answer">Yes. <code>add guest --expires=7d</code> creates a client that stops working after the given period. A duration is written as <code>Nh</code>, <code>Nd</code> or <code>Nw</code>: <code>12h</code>, <code>7d</code>, <code>4w</code>. A cron job checks every five minutes and removes what has expired.</div></details>
+      <details><summary>Can I manage the server from a script or a bot?</summary><div class="answer">Yes, through <code>--json</code>. Management commands reply with exactly one JSON document on stdout, including when they fail, and human messages go to stderr. <code>list</code> and <code>stats</code> return a plain array instead, and <code>show</code> and <code>diagnose</code> do not take the flag. A third-party Telegram bot, <a href="https://github.com/ekuraev/awgram">awgram</a>, already runs on this interface.</div></details>
+      <details><summary>What does a command return when it fails?</summary><div class="answer">It depends on how it failed. An emergency exit (a crash, a bad option, a refused confirmation) returns <code>ok:false</code> with a human-readable <code>error</code> and <code>rc</code>. A batch command such as <code>add</code> instead reports the outcome per name inside <code>results[]</code> and sets <code>ok:false</code>, with no <code>rc</code> field. The process exit code is authoritative and <code>ok</code> mirrors it. Do not parse the error text: decide from <code>ok</code>, <code>rc</code> and <code>status</code>.</div></details>
+      <details><summary>The kernel was upgraded and the tunnel stopped working. What now?</summary><div class="answer"><code>repair-module</code> rebuilds the kernel module through DKMS, loads it and starts the service again. A kernel upgrade does not mean a reinstall.</div></details>
+    </div>
+  </div>
+</section>
+
+<section id="related" class="related">
+  <div class="wrap">
+    <h2>See also</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9878;&#65039;</div>
+        <h3>Compared to the official app</h3>
+        <p>The same AmneziaWG 2.0 protocol, delivered differently: no Docker, the whole server tuned and hardened.</p>
+        <a class="go" href="/amneziawg-installer/compare/">What differs &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128279;</div>
+        <h3>Two-server cascade</h3>
+        <p>Chain two servers so Russian traffic exits from a Russian IP and everything else goes abroad.</p>
+        <a class="go" href="/amneziawg-installer/cascade/">Cascade setup &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128640;</div>
+        <h3>Get started</h3>
+        <p>One command turns a clean Ubuntu or Debian VPS into a working AmneziaWG 2.0 server.</p>
+        <a class="go" href="/amneziawg-installer/#quick-start">Quick start &#8594;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="foot-links">
+          <a href="/amneziawg-installer/">Home</a>
+          <a href="https://github.com/bivlked/amneziawg-installer">Repository</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Install guide</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.en.md">Advanced</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CHANGELOG.en.md">Changelog</a>
+          <a href="https://github.com/bivlked/amneziawg-installer#similar-tools">Similar tools</a>
+        </div>
+        <p class="note">Open source under the MIT license. If the project helped you, a star on GitHub helps others find it.</p>
+      </div>
+      <div class="lang-switch"><a class="active" aria-current="page" aria-label="English" href="/amneziawg-installer/manage/">EN</a> <a aria-label="Русский" href="/amneziawg-installer/ru/manage/">RU</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -82,7 +82,7 @@
     { "@type": "Question", "name": "Does it run on ARM and Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one." } },
     { "@type": "Question", "name": "How do I update to a new release?", "acceptedAnswer": { "@type": "Answer", "text": "Download the new release script on the same server and run it with the --force flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot." } },
     { "@type": "Question", "name": "Can I drive it from a script or a bot?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Most management commands take --json and answer with a single JSON object even when the command failed, so the reply is always parseable. The exceptions: list and stats return an array, and show and diagnose do not take the flag. New fields show up over time; existing ones do not get renamed. For unattended runs there is --yes, and with AWG_STRICT_CONFIRM=1 a command like removing a client refuses to run when --yes is missing instead of quietly agreeing. A third-party Telegram bot, awgram, already runs on this interface." } },
-    { "@type": "Question", "name": "AmneziaWG won't connect, though plain WireGuard works?", "acceptedAnswer": { "@type": "Answer", "text": "Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the [Interface] parameters on the server and the client: Jc/Jmin/Jmax, S1-S4, H1-H4, and in version 2.0 I1-I5. Every value must match byte for byte, and I1-I5 are case-sensitive (uppercase only); if I1 is present on one side but absent on the other, the side without it falls back to 1.0 and the handshake silently fails. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the detailed troubleshooting guide." } }
+    { "@type": "Question", "name": "AmneziaWG won't connect, though plain WireGuard works?", "acceptedAnswer": { "@type": "Answer", "text": "Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the [Interface] parameters on the server and the client. S1-S4 and H1-H4 must match: the receiver strips that padding and checks those headers, so any mismatch here means the packet is dropped and the handshake never completes. In 2.0, H1-H4 are ranges - the ranges must be the same on both sides. Jc/Jmin/Jmax and the 2.0 concealment packets I1-I5 do NOT have to match: they are separate decoy packets, the other side discards them, and a node without I1 simply never sends them. Case does matter for I1-I5: uppercase only. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the detailed troubleshooting guide." } }
   ]
 }
 </script>
@@ -216,7 +216,7 @@
 <section id="guides" class="related">
   <div class="wrap">
     <h2>Guides and comparisons</h2>
-    <p class="sub">Two deeper reads once the basic server is running.</p>
+    <p class="sub">Three deeper reads once the basic server is running.</p>
     <div class="grid">
       <div class="card">
         <div class="ico" aria-hidden="true">&#9878;&#65039;</div>
@@ -229,6 +229,12 @@
         <h3>Two-server cascade</h3>
         <p>Chain two servers so Russian traffic exits directly from a Russian IP while everything else goes through a foreign exit. The split lives on the server.</p>
         <a class="go" href="cascade/">Cascade setup &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128736;&#65039;</div>
+        <h3>Managing clients</h3>
+        <p>Every management command in one table: add, remove, QR codes, time-limited access and JSON output for scripts and bots.</p>
+        <a class="go" href="manage/">Client management &#8594;</a>
       </div>
     </div>
   </div>
@@ -245,7 +251,7 @@
       <details><summary>Does it run on ARM and Raspberry Pi?</summary><div class="answer">Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one.</div></details>
       <details><summary>How do I update to a new release?</summary><div class="answer">Download the new release script on the same server and run it with the <code>--force</code> flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot.</div></details>
       <details><summary>Can I drive it from a script or a bot?</summary><div class="answer">Yes. Most management commands take <code>--json</code> and answer with a single JSON object even when the command failed, so the reply is always parseable. The exceptions: <code>list</code> and <code>stats</code> return an array, and <code>show</code> and <code>diagnose</code> do not take the flag. New fields show up over time; existing ones do not get renamed. For unattended runs there is <code>--yes</code>, and with <code>AWG_STRICT_CONFIRM=1</code> a command like removing a client refuses to run when <code>--yes</code> is missing instead of quietly agreeing. A third-party Telegram bot, <a href="https://github.com/ekuraev/awgram">awgram</a>, already runs on this interface.</div></details>
-      <details><summary>AmneziaWG won't connect, though plain WireGuard works?</summary><div class="answer">Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the <code>[Interface]</code> parameters on the server and the client: Jc/Jmin/Jmax, S1-S4, H1-H4, and in version 2.0 I1-I5. Every value must match byte for byte, and I1-I5 are case-sensitive (uppercase only); if I1 is present on one side but absent on the other, the side without it falls back to 1.0 and the handshake silently fails. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.en.md#troubleshooting-adv">detailed troubleshooting guide</a>.</div></details>
+      <details><summary>AmneziaWG won't connect, though plain WireGuard works?</summary><div class="answer">Almost always an obfuscation or version mismatch, not the network. If plain WireGuard comes up on the same server but AmneziaWG does not, compare the <code>[Interface]</code> parameters on the server and the client. S1-S4 and H1-H4 must match: the receiver strips that padding and checks those headers, so any mismatch here means the packet is dropped and the handshake never completes. In 2.0, H1-H4 are ranges - the ranges must be the same on both sides. Jc/Jmin/Jmax and the 2.0 concealment packets I1-I5 do NOT have to match: they are separate decoy packets, the other side discards them, and a node without I1 simply never sends them. Case does matter for I1-I5: uppercase only. Check the versions too: older amneziawg-tools builds cannot speak 2.0. Full walkthrough in the <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.en.md#troubleshooting-adv">detailed troubleshooting guide</a>.</div></details>
     </div>
   </div>
 </section>
