@@ -234,3 +234,6 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px soli
 .codeblock { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin: 0 0 14px; overflow-x: auto; }
 .codeblock pre { margin: 0; font-size: 14px; color: #cdd9e5; white-space: pre; }
 .codeblock .cap { margin: 0 0 10px; color: var(--text-dim); font-size: 13.5px; }
+
+/* многоабзацная карточка-врезка (используется только на warp-ru) */
+.card p + p { margin-top: 14px; }

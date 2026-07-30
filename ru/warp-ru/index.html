@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Российские сайты не открываются через VPN: что настроить на сервере</title>
+<meta name="description" content="Если через свой VPN не открываются банк, госуслуги или маркетплейс - трафик к российским сетям можно пустить отдельным маршрутом через Cloudflare WARP. Второй сервер не нужен, но настоящего российского IP этот способ не даёт.">
+<link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/ru/warp-ru/">
+<link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/warp-ru/">
+<link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/warp-ru/">
+<link rel="alternate" hreflang="x-default" href="https://bivlked.github.io/amneziawg-installer/warp-ru/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Российские сайты через VPN: отдельный маршрут на том же сервере">
+<meta property="og:description" content="Трафик к российским сетям уходит через Cloudflare WARP, весь остальной - напрямую с вашего сервера. Второй сервер не нужен, список сетей обновляется сам.">
+<meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/ru/warp-ru/">
+<meta property="og:site_name" content="amneziawg-installer">
+<meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-warp-ru.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Российский трафик через Cloudflare WARP, остальной напрямую с вашего сервера AmneziaWG">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og-warp-ru.png">
+<meta name="twitter:title" content="Российские сайты через VPN: отдельный маршрут на том же сервере">
+<meta name="twitter:description" content="Российский трафик через Cloudflare WARP, остальной напрямую. Второй сервер не нужен.">
+<meta name="theme-color" content="#0e1116">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../../assets/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Это VPN с российским IP?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Российские сайты увидят адрес Cloudflare вместо адреса вашего дата-центра. Сервису, которому достаточно не видеть зарубежный дата-центр, этого хватит. Но сервисам, которым нужен именно российский адрес, адреса Cloudflare не хватит - там понадобится каскад со вторым сервером в России." } },
+    { "@type": "Question", "name": "Нужен ли для этого второй сервер?", "acceptedAnswer": { "@type": "Answer", "text": "Нет, всё делается на том же сервере, где уже стоит amneziawg-installer. Второй выход в интернет поднимается на нём же отдельным интерфейсом. Это главное отличие от каскада, которому нужны два VPS." } },
+    { "@type": "Question", "name": "Не сломается ли доступ к зарубежным сайтам?", "acceptedAnswer": { "@type": "Answer", "text": "Нет, зарубежный трафик идёт прежним путём и схема его не касается. В отдельную таблицу маршрутов попадают только российские сети, и маршрута по умолчанию в ней нет. Поэтому всё, чего в этой таблице не нашлось, автоматически уходит обычной дорогой - прямо с вашего сервера." } },
+    { "@type": "Question", "name": "Откуда берётся список российских сетей?", "acceptedAnswer": { "@type": "Answer", "text": "Сервер получает его по BGP от сервиса antifilter.network. На момент проверки это около 11800 сетей, и они обновляются сами, вести список руками не нужно. Регистрация внешнего адреса сервера в этом сервисе обязательна, без неё BGP-сессия не поднимется." } },
+    { "@type": "Question", "name": "Что будет, если схема сломается?", "acceptedAnswer": { "@type": "Answer", "text": "Зависит от того, что именно сломалось. Если отвалится фид или остановится BGP-демон, маршруты снимаются и российский трафик возвращается на прямой выход, связь не теряется. Но есть и обратный случай: если сам WARP перестал отвечать, а интерфейс остался поднят, маршруты продолжают вести в никуда, и российские сайты перестают открываться совсем. Автоматического возврата тут нет, поэтому следить надо не только за BGP-сессией, но и за проходимостью второго выхода." } },
+    { "@type": "Question", "name": "Это входит в установщик?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Это надстройка поверх обычной установки, отдельная пошаговая инструкция. Второй выход и BGP-демон - другой класс задач, держать их внутри установочного скрипта неправильно. Обновление установщика схему не тронет, но и не восстановит." } },
+    { "@type": "Question", "name": "Что настраивать на клиентах?", "acceptedAnswer": { "@type": "Answer", "text": "Ничего. Развилка живёт на сервере и работает одинаково для всех подключённых клиентов. Конфиги перевыпускать не нужно, приложение на телефоне или компьютере остаётся прежним." } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "amneziawg-installer", "item": "https://bivlked.github.io/amneziawg-installer/ru/" },
+    { "@type": "ListItem", "position": 2, "name": "Российский трафик через Cloudflare WARP", "item": "https://bivlked.github.io/amneziawg-installer/ru/warp-ru/" }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Российские сайты не открываются через VPN: отдельный маршрут на том же сервере",
+  "description": "Выборочная маршрутизация российского сегмента через Cloudflare WARP на сервере AmneziaWG: трафик к российским сетям уходит вторым выходом, остальной - напрямую. Список сетей приходит по BGP и обновляется сам.",
+  "inLanguage": "ru",
+  "image": "https://bivlked.github.io/amneziawg-installer/assets/og-warp-ru.png",
+  "datePublished": "2026-07-30",
+  "dateModified": "2026-07-30",
+  "author": { "@type": "Person", "name": "bivlked" },
+  "publisher": { "@type": "Organization", "name": "amneziawg-installer", "logo": { "@type": "ImageObject", "url": "https://bivlked.github.io/amneziawg-installer/assets/apple-touch-icon.png" } },
+  "mainEntityOfPage": "https://bivlked.github.io/amneziawg-installer/ru/warp-ru/",
+  "isPartOf": "https://bivlked.github.io/amneziawg-installer/ru/"
+}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">К содержимому</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/amneziawg-installer/ru/">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#3ddc97"/><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#07120c"/></svg>
+      amneziawg-installer
+    </a>
+    <nav class="nav-right" aria-label="Навигация по сайту">
+      <span class="lang-switch"><a aria-label="English" href="/amneziawg-installer/warp-ru/">EN</a><a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/warp-ru/">RU</a></span>
+      <a class="btn btn-sm" href="https://github.com/bivlked/amneziawg-installer">Поставить звезду</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <h1>Российские сайты не открываются через VPN: отдельный маршрут на том же сервере</h1>
+    <p class="lede">Многие российские сервисы закрывают доступ зарубежным дата-центрам целыми диапазонами, и через VPN банк, госуслуги или маркетплейс перестают открываться. Эта надстройка к обычной установке amneziawg-installer пускает трафик к российским сетям через Cloudflare WARP, а остальной отправляет напрямую с вашего сервера. Второй сервер не нужен. Настоящего российского адреса она не даёт - для него нужен <a href="/amneziawg-installer/ru/cascade/">каскад</a>.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/bivlked/amneziawg-installer/blob/main/WARP-RU.md">Полная пошаговая инструкция</a>
+      <a class="btn" href="#how">Как это работает</a>
+    </div>
+    <div class="trust">
+      <span>Один сервер: второй VPS не нужен</span>
+      <span>Около 11800 российских сетей, список обновляется сам</span>
+      <span>Зарубежный трафик идёт прежним путём</span>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>Как это работает</h2>
+    <p class="sub">У сервера AmneziaWG появляется второй выход в интернет, и трафик делится по адресу назначения.</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 820 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схема движения трафика: клиент подключается к своему серверу AmneziaWG; трафик к российским сетям уходит через Cloudflare WARP, и российские сайты видят адрес Cloudflare, а весь остальной трафик идёт напрямую с сервера, и зарубежные сайты видят его собственный адрес." font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+        <defs><marker id="wad" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0l6 3-6 3z" fill="#3ddc97"/></marker></defs>
+        <rect x="24" y="150" width="150" height="66" rx="12" fill="#1b222c" stroke="#4a5563"/>
+        <text x="99" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Клиент</text>
+        <text x="99" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">одно подключение</text>
+        <line x1="176" y1="183" x2="232" y2="183" stroke="#3ddc97" stroke-width="2" marker-end="url(#wad)"/>
+        <rect x="236" y="138" width="186" height="92" rx="12" fill="#10261c" stroke="#2bbd80"/>
+        <g transform="translate(248 150) scale(0.7)"><path d="M16 6l8 4v6c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10v-6l8-4z" fill="#3ddc97"/></g>
+        <text x="342" y="178" text-anchor="middle" font-size="15" font-weight="600" fill="#e6edf3">Ваш сервер</text>
+        <text x="342" y="197" text-anchor="middle" font-size="12" fill="#9aa7b4">один, здесь развилка</text>
+        <path d="M422 164 C 452 118, 456 96, 482 90" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#wad)"/>
+        <text x="424" y="108" text-anchor="middle" font-size="12" fill="#9aa7b4">сети РФ</text>
+        <rect x="486" y="54" width="140" height="72" rx="12" fill="#10261c" stroke="#2bbd80"/>
+        <text x="556" y="84" text-anchor="middle" font-size="14" font-weight="600" fill="#e6edf3">Cloudflare WARP</text>
+        <text x="556" y="103" text-anchor="middle" font-size="12" fill="#9aa7b4">второй выход</text>
+        <line x1="628" y1="90" x2="654" y2="90" stroke="#3ddc97" stroke-width="2" marker-end="url(#wad)"/>
+        <rect x="658" y="54" width="158" height="72" rx="12" fill="#1b222c" stroke="#4a5563"/>
+        <text x="737" y="84" text-anchor="middle" font-size="14" font-weight="600" fill="#e6edf3">Российские сайты</text>
+        <text x="737" y="103" text-anchor="middle" font-size="11" fill="#9aa7b4">видят адрес Cloudflare</text>
+        <path d="M410 230 C 448 288, 500 300, 596 300" fill="none" stroke="#3ddc97" stroke-width="2" marker-end="url(#wad)"/>
+        <text x="470" y="272" text-anchor="middle" font-size="12" fill="#9aa7b4">всё остальное, напрямую</text>
+        <rect x="600" y="264" width="200" height="72" rx="12" fill="#1b222c" stroke="#4a5563"/>
+        <text x="700" y="294" text-anchor="middle" font-size="14" font-weight="600" fill="#e6edf3">Зарубежные сайты</text>
+        <text x="700" y="313" text-anchor="middle" font-size="11" fill="#9aa7b4">видят адрес вашего сервера</text>
+      </svg>
+      <figcaption>Один сервер и два выхода. К российским сетям трафик идёт через Cloudflare WARP, весь остальной - напрямую, как и раньше.</figcaption>
+    </figure>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#127760;</div>
+        <h3>Второй выход на том же сервере</h3>
+        <p>Cloudflare WARP - это обычный WireGuard, и поднять его можно тем же инструментом, который уже стоит на сервере. Отдельно ставить <code>wireguard-tools</code> и поднимать вторую машину не придётся: WARP работает через второй сетевой интерфейс на том же сервере.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#129517;</div>
+        <h3>Развилка по адресу назначения</h3>
+        <p>Российские сети складываются в отдельную таблицу маршрутов, и трафик клиентов сначала заглядывает туда. Маршрута по умолчанию в этой таблице нет, поэтому всё, чего в ней не нашлось, автоматически уходит прежней дорогой.</p>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128260;</div>
+        <h3>Список сетей приходит сам</h3>
+        <p>Сервер подписывается по BGP на фид antifilter.network и получает список российских сетей, на момент проверки около 11800 штук. Он обновляется сам, вести его руками не нужно.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <h2>Когда это нужно, а когда нет</h2>
+    <p class="sub">Схема решает одну конкретную задачу и не решает соседние.</p>
+    <p>Она пригодится, если через свой VPN нужен вход на российские сайты, а они из-за зарубежного адреса отказывают: показывает капчу, не пускает в личный кабинет или отклоняет операцию. После настройки трафик к сетям из списка выходит через Cloudflare. Зарубежный по-прежнему идёт напрямую, с адреса вашего сервера.</p>
+    <div class="card lead mt">
+      <div class="ico" aria-hidden="true">&#9888;&#65039;</div>
+      <h3>Чего эта схема не даёт</h3>
+      <p>Российские сайты увидят <strong>адрес Cloudflare, а не российский</strong>. Сервису, которому достаточно не видеть зарубежный дата-центр, этого хватит; тому, кому нужен именно российский адрес, - нет, и там потребуется <a href="/amneziawg-installer/ru/cascade/">каскад со вторым сервером в России</a>.</p>
+      <p>Ограничения схемы. Адреса WARP общие на многих пользователей, поэтому отдельные сайты могут встретить капчей или гео-ограничением. Схема работает по IPv4. Список ведёт сторонний сервис, и ошибаться он может в обе стороны: не знать какую-то российскую сеть или отдать лишнюю. Российский трафик идёт через вторую обёртку: это добавляет несколько миллисекунд и нагрузку на процессор. Зарубежный трафик идёт прежним путём.</p>
+    </div>
+    <p>Браться за неё стоит не всегда. Если российские сайты и так открываются, чинить нечего. Если проблема в том, что рубят сам туннель на подходе к серверу, это другая история и лечится она иначе. И если российские адреса можно убрать из туннеля прямо на клиенте, проще задать их списком в его конфиге - тогда российский трафик пойдёт мимо VPN с домашнего адреса.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/bivlked/amneziawg-installer/blob/main/WARP-RU.md">Полная пошаговая инструкция</a>
+      <a class="btn" href="/amneziawg-installer/ru/cascade/">Вариант с настоящим российским IP</a>
+    </div>
+  </div>
+</section>
+
+<section id="steps">
+  <div class="wrap">
+    <h2>Что предстоит сделать</h2>
+    <p class="sub">Четыре шага, все на одном сервере. Команды - в инструкции, здесь только объём работ.</p>
+    <ol class="steps">
+      <li class="step"><span class="n" aria-hidden="true"></span><div><strong>Профиль WARP.</strong><p>Утилита <code>wgcf</code> выпускает конфиг для Cloudflare WARP.</p></div></li>
+      <li class="step"><span class="n" aria-hidden="true"></span><div><strong>Второй интерфейс и правило маршрутизации.</strong><p>Интерфейс поднимается тем же инструментом, что уже стоит на сервере, а правило отправляет трафик клиентов сначала в отдельную таблицу маршрутов.</p></div></li>
+      <li class="step"><span class="n" aria-hidden="true"></span><div><strong>Подписка на фид.</strong><p>Внешний адрес сервера регистрируется в antifilter.network. Без регистрации BGP-сессия не поднимется.</p></div></li>
+      <li class="step"><span class="n" aria-hidden="true"></span><div><strong>BGP-демон BIRD.</strong><p>Он получает список российских сетей и наполняет им таблицу маршрутов.</p></div></li>
+    </ol>
+    <p class="inline-note mt">Две вещи стоит проверить до начала, обе блокирующие: свободна ли таблица маршрутизации 200 и не занят ли BIRD другой задачей. Если BIRD уже работает под что-то своё, его конфиг нельзя заменять целиком - нужные блоки добавляют к существующему.</p>
+  </div>
+</section>
+
+<section id="trust">
+  <div class="wrap">
+    <h2>Проверено, а не пересказано</h2>
+    <p class="sub">Схему прислал пользователь, я повторил её у себя целиком.</p>
+    <p>Автор схемы - @alexfiu4-cyber, обсуждение в issue #103. Я собрал её на стенде от начала до конца поверх обычной установки amneziawg-installer на Ubuntu 24.04: BGP-сессия поднялась, около 11800 сетей встали в таблицу маршрутов, клиент за туннелем стал виден российским сервисам с адреса Cloudflare, а зарубежным - с адреса сервера. По дороге нашлись два места, где исходный рецепт не заводился как есть, оба разобраны в инструкции. Там же таблица поведения при сбоях, включая неприятный случай, когда возврата на прямой выход не происходит.</p>
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/bivlked/amneziawg-installer/issues/103">Обсуждение #103</a>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Частые вопросы</h2>
+    <div class="faq">
+      <details><summary>Это VPN с российским IP?</summary><div class="answer">Нет. Российские сайты увидят адрес Cloudflare вместо адреса вашего дата-центра. Сервису, которому достаточно не видеть зарубежный дата-центр, этого хватит. Но сервисам, которым нужен именно российский адрес, адреса Cloudflare не хватит - там понадобится <a href="/amneziawg-installer/ru/cascade/">каскад со вторым сервером в России</a>.</div></details>
+      <details><summary>Нужен ли для этого второй сервер?</summary><div class="answer">Нет, всё делается на том же сервере, где уже стоит amneziawg-installer. Второй выход в интернет поднимается на нём же отдельным интерфейсом. Это главное отличие от каскада, которому нужны два VPS.</div></details>
+      <details><summary>Не сломается ли доступ к зарубежным сайтам?</summary><div class="answer">Нет, зарубежный трафик идёт прежним путём и схема его не касается. В отдельную таблицу маршрутов попадают только российские сети, и маршрута по умолчанию в ней нет. Поэтому всё, чего в этой таблице не нашлось, автоматически уходит обычной дорогой - прямо с вашего сервера.</div></details>
+      <details><summary>Откуда берётся список российских сетей?</summary><div class="answer">Сервер получает его по BGP от сервиса antifilter.network. На момент проверки это около 11800 сетей, и они обновляются сами, вести список руками не нужно. Регистрация внешнего адреса сервера в этом сервисе обязательна, без неё BGP-сессия не поднимется.</div></details>
+      <details><summary>Что будет, если схема сломается?</summary><div class="answer">Зависит от того, что именно сломалось. Если отвалится фид или остановится BGP-демон, маршруты снимаются и российский трафик возвращается на прямой выход, связь не теряется. Но есть и обратный случай: если сам WARP перестал отвечать, а интерфейс остался поднят, маршруты продолжают вести в никуда, и российские сайты перестают открываться совсем. Автоматического возврата тут нет, поэтому следить надо не только за BGP-сессией, но и за проходимостью второго выхода.</div></details>
+      <details><summary>Это входит в установщик?</summary><div class="answer">Нет. Это надстройка поверх обычной установки, отдельная пошаговая инструкция. Второй выход и BGP-демон - другой класс задач, держать их внутри установочного скрипта неправильно. Обновление установщика схему не тронет, но и не восстановит.</div></details>
+      <details><summary>Что настраивать на клиентах?</summary><div class="answer">Ничего. Развилка живёт на сервере и работает одинаково для всех подключённых клиентов. Конфиги перевыпускать не нужно, приложение на телефоне или компьютере остаётся прежним.</div></details>
+    </div>
+  </div>
+</section>
+
+<section id="related" class="related">
+  <div class="wrap">
+    <h2>Смотрите также</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128279;</div>
+        <h3>Каскад из двух серверов</h3>
+        <p>Другой ответ на ту же задачу: российские сайты получают настоящий российский адрес, но нужен второй VPS в России.</p>
+        <a class="go" href="/amneziawg-installer/ru/cascade/">Как устроен каскад &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128640;</div>
+        <h3>Начать</h3>
+        <p>Схема ставится поверх обычной установки. Одна команда превращает чистый VPS в рабочий сервер AmneziaWG 2.0.</p>
+        <a class="go" href="/amneziawg-installer/ru/#quick-start">Быстрый старт &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#128736;&#65039;</div>
+        <h3>Управление клиентами</h3>
+        <p>Добавление, удаление и перевыпуск клиентов из командной строки, с выводом в JSON для скриптов и ботов.</p>
+        <a class="go" href="/amneziawg-installer/ru/manage/">Управление клиентами &#8594;</a>
+      </div>
+      <div class="card">
+        <div class="ico" aria-hidden="true">&#9878;&#65039;</div>
+        <h3>Сравнение с приложением Amnezia</h3>
+        <p>Тот же протокол AmneziaWG 2.0, но иначе: без Docker, весь сервер оптимизирован и защищён, тонкая настройка обфускации.</p>
+        <a class="go" href="/amneziawg-installer/ru/compare/">Чем отличается &#8594;</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <div class="foot-links">
+          <a href="/amneziawg-installer/ru/">Главная</a>
+          <a href="https://github.com/bivlked/amneziawg-installer">Репозиторий</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/INSTALL_VPS.md">Гайд по установке</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/ADVANCED.md">Расширенно</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/CHANGELOG.md">Изменения</a>
+          <a href="https://github.com/bivlked/amneziawg-installer/blob/main/WARP-RU.md">Гайд по WARP</a>
+        </div>
+        <p class="note">Открытый код под лицензией MIT. Если проект помог - звезда на GitHub помогает другим его найти.</p>
+      </div>
+      <div class="lang-switch"><a aria-label="English" href="/amneziawg-installer/warp-ru/">EN</a> <a class="active" aria-current="page" aria-label="Русский" href="/amneziawg-installer/ru/warp-ru/">RU</a></div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
