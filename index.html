@@ -4,26 +4,26 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AmneziaWG 2.0 VPN Installer for Ubuntu and Debian VPS</title>
-<meta name="description" content="One command turns your own Ubuntu or Debian VPS into an AmneziaWG 2.0 VPN server. About twenty minutes, then a QR code for your phone. DPI bypass, hardened firewall, MIT licensed.">
+<meta name="description" content="One command turns your own Ubuntu or Debian VPS into an AmneziaWG 2.0 / 3.0 VPN server. About twenty minutes, then a QR code for your phone. DPI bypass, hardened firewall, MIT licensed.">
 <link rel="canonical" href="https://bivlked.github.io/amneziawg-installer/">
 <link rel="alternate" hreflang="en" href="https://bivlked.github.io/amneziawg-installer/">
 <link rel="alternate" hreflang="ru" href="https://bivlked.github.io/amneziawg-installer/ru/">
 <link rel="alternate" hreflang="x-default" href="https://bivlked.github.io/amneziawg-installer/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="AmneziaWG 2.0 VPN Installer for Ubuntu and Debian VPS">
-<meta property="og:description" content="One command turns a clean Ubuntu or Debian VPS into a DPI-resistant AmneziaWG 2.0 VPN server. Open source, MIT licensed.">
+<meta property="og:description" content="One command turns a clean Ubuntu or Debian VPS into a DPI-resistant AmneziaWG 2.0 / 3.0 VPN server. Open source, MIT licensed.">
 <meta property="og:url" content="https://bivlked.github.io/amneziawg-installer/">
 <meta property="og:site_name" content="amneziawg-installer">
 <meta property="og:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="amneziawg-installer - AmneziaWG 2.0 VPN server in one command">
+<meta property="og:image:alt" content="amneziawg-installer - AmneziaWG 2.0 / 3.0 VPN server in one command">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="ru_RU">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://bivlked.github.io/amneziawg-installer/assets/og.png">
 <meta name="twitter:title" content="AmneziaWG 2.0 VPN Installer for Ubuntu and Debian VPS">
-<meta name="twitter:description" content="One command turns a clean Ubuntu or Debian VPS into a DPI-resistant AmneziaWG 2.0 VPN server. Open source, MIT licensed.">
+<meta name="twitter:description" content="One command turns a clean Ubuntu or Debian VPS into a DPI-resistant AmneziaWG 2.0 / 3.0 VPN server. Open source, MIT licensed.">
 <meta name="google-site-verification" content="3E6FtjgNbCI2T4Ho99Hl--kZt4UFRLLwphMFXHerhmE">
 <meta name="theme-color" content="#0e1116">
 <meta name="color-scheme" content="dark">
@@ -35,7 +35,7 @@
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "name": "amneziawg-installer",
-  "description": "One-command installer and management toolkit for a self-hosted AmneziaWG 2.0 VPN on Ubuntu and Debian servers.",
+  "description": "One-command installer and management toolkit for a self-hosted AmneziaWG 2.0 / 3.0 VPN on Ubuntu and Debian servers.",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Ubuntu 24.04, Ubuntu 25.10, Ubuntu 26.04, Debian 12, Debian 13",
   "softwareVersion": "5.24.0",
@@ -79,6 +79,7 @@
     { "@type": "Question", "name": "Do I need Linux experience?", "acceptedAnswer": { "@type": "Answer", "text": "No. You copy one command into an SSH session on a clean VPS. The script handles the kernel module, firewall, forwarding, and the first client, then prints a QR code and a vpn link." } },
     { "@type": "Question", "name": "Which VPS should I pick?", "acceptedAnswer": { "@type": "Answer", "text": "A clean Ubuntu or Debian VPS with 1 vCPU and at least 512 MB of RAM. It is meant for a dedicated VPS, not a home router or shared hosting." } },
     { "@type": "Question", "name": "Does it bypass DPI and censorship?", "acceptedAnswer": { "@type": "Answer", "text": "AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today." } },
+    { "@type": "Question", "name": "Which AmneziaWG version does the installer set up, 2.0 or 3.0?", "acceptedAnswer": { "@type": "Answer", "text": "It depends on the host. On x86 with kernel 6.7 or newer the module comes from the official PPA, which has been on the 3.0 line since the end of July, and that covers most current VPS hosts. Debian 12 and the ARM servers we ship a prebuilt module for get the proven 2.0 module: the 3.0 line is not validated there yet, so we keep 2.0 on purpose. Either way the generated configs use the 2.0 obfuscation set (H1-H4, S1-S4, I1-I5) and none of the new 3.0 features are enabled yet, so both 2.0 and 3.0 clients connect without edits." } },
     { "@type": "Question", "name": "Does it run on ARM and Raspberry Pi?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one." } },
     { "@type": "Question", "name": "How do I update to a new release?", "acceptedAnswer": { "@type": "Answer", "text": "Download the new release script on the same server and run it with the --force flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot." } },
     { "@type": "Question", "name": "Can I drive it from a script or a bot?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Most management commands take --json and answer with a single JSON object even when the command failed, so the reply is always parseable. The exceptions: list and stats return an array, and show and diagnose do not take the flag. New fields show up over time; existing ones do not get renamed. For unattended runs there is --yes, and with AWG_STRICT_CONFIRM=1 a command like removing a client refuses to run when --yes is missing instead of quietly agreeing. A third-party Telegram bot, awgram, already runs on this interface." } },
@@ -157,7 +158,7 @@
   <div class="wrap">
     <h2>What it does</h2>
     <p class="sub">AmneziaWG is WireGuard with traffic obfuscation, so the handshake no longer looks like a standard VPN to deep packet inspection. This script sets up the whole server for you.</p>
-    <p>You give the command a fresh VPS over SSH. It installs the AmneziaWG 2.0 kernel module through DKMS, hardens the firewall, enables forwarding, tunes the system for a single-purpose VPN box, and creates your first client. At the end you get a QR code and a vpn link for one-tap import into the Amnezia client. Adding another device later is a single command.</p>
+    <p>You give the command a fresh VPS over SSH. It installs the AmneziaWG kernel module through DKMS, hardens the firewall, enables forwarding, tunes the system for a single-purpose VPN box, and creates your first client. At the end you get a QR code and a vpn link for one-tap import into the Amnezia client. Adding another device later is a single command.</p>
   </div>
 </section>
 
@@ -254,6 +255,7 @@
       <details><summary>Do I need Linux experience?</summary><div class="answer">No. You copy one command into an SSH session on a clean VPS. The script handles the kernel module, firewall, forwarding, and the first client, then prints a QR code and a vpn link.</div></details>
       <details><summary>Which VPS should I pick?</summary><div class="answer">A clean Ubuntu or Debian VPS with 1 vCPU and at least 512 MB of RAM. It is meant for a dedicated VPS, not a home router or shared hosting.</div></details>
       <details><summary>Does it bypass DPI and censorship?</summary><div class="answer">AmneziaWG 2.0 adds obfuscation on top of WireGuard to resist the deep packet inspection used in Russia, Iran, China, and on school or corporate networks. No method is guaranteed against every operator, but the protocol gives you the obfuscation settings that get through today.</div></details>
+      <details><summary>Which AmneziaWG version does the installer set up, 2.0 or 3.0?</summary><div class="answer">It depends on the host. On x86 with kernel 6.7 or newer the module comes from the official PPA, which has been on the 3.0 line since the end of July, and that covers most current VPS hosts. Debian 12 and the ARM servers we ship a prebuilt module for get the proven 2.0 module: the 3.0 line is not validated there yet, so we keep 2.0 on purpose. Either way the generated configs use the 2.0 obfuscation set (H1-H4, S1-S4, I1-I5) and none of the new 3.0 features are enabled yet, so both 2.0 and 3.0 clients connect without edits.</div></details>
       <details><summary>Does it run on ARM and Raspberry Pi?</summary><div class="answer">Yes. Prebuilt ARM64 modules cover Raspberry Pi 3, 4 and 5, Hetzner CAX, Oracle Ampere A1, and AWS Graviton. The same command picks the right one.</div></details>
       <details><summary>How do I update to a new release?</summary><div class="answer">Download the new release script on the same server and run it with the <code>--force</code> flag. Server keys, clients, and obfuscation settings survive the reinstall. After kernel updates the DKMS module rebuilds automatically on the next boot.</div></details>
       <details><summary>Can I drive it from a script or a bot?</summary><div class="answer">Yes. Most management commands take <code>--json</code> and answer with a single JSON object even when the command failed, so the reply is always parseable. The exceptions: <code>list</code> and <code>stats</code> return an array, and <code>show</code> and <code>diagnose</code> do not take the flag. New fields show up over time; existing ones do not get renamed. For unattended runs there is <code>--yes</code>, and with <code>AWG_STRICT_CONFIRM=1</code> a command like removing a client refuses to run when <code>--yes</code> is missing instead of quietly agreeing. A third-party Telegram bot, <a href="https://github.com/ekuraev/awgram">awgram</a>, already runs on this interface.</div></details>
