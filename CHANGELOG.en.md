@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [5.25.0] - 2026-08-08
+
+**v5.25.0** - reversibility before AmneziaWG 3.0: a lost-access warning, a removed parameter no longer disappears silently, and the module version comes from the loaded one.
+
 ### Added
 
 - **A warning before any operation that restarts the interface: you can cut yourself off from the server.** The installer offers routing modes where all traffic goes into the tunnel, its audience is people without Linux experience, and some of them reach the server over SSH through that very VPN. Such a person ran `manage restart`, lost access and had no idea why: there was no warning in any of the six scripts. The script now determines whether the current session goes through the tunnel and says so plainly, naming the console or VNC in the provider's panel as the fallback, since those work independently of the VPN. Detection uses two paths, because `$SSH_CONNECTION` alone is not enough: the script runs through `sudo`, `sudo` does `env_reset` by default, and that variable is not in the Debian/Ubuntu `env_keep` list - so the second path is `who`, matched against the script's own tty. There are exactly three states rather than two: "through the tunnel", "not through the tunnel" and "could not determine" (for instance `who` returning a hostname instead of an address with `UseDNS yes`); the last one prints the generic warning, because presenting a guess as a fact is worse than saying "unknown". The warning is printed BEFORE the confirmation prompt, so it is visible with `--yes` too: a non-interactive run cuts you off just as effectively. 🔴 **The tunnel subnet is NOT guessed**: it comes from the live interface (`ip -4 -o addr show awg0`), failing that from the `Address` line of the server config, and only then from the environment variable; if nothing is found the verdict is "unknown". That matters because `manage restart` does not load `awgsetup_cfg.init`: with a substituted literal `10.9.9.1/24` anyone who installed with `--subnet` would get a confident "you are not through the tunnel" in exactly the scenario the check exists for. A substituted default turns "there is no data" into "there is data, and it says this". Warnings were also added to the two `apply_config` branches where a restart happens UNEXPECTEDLY - when `awg-quick strip` or `awg syncconf` fails during a routine `add`/`remove`: there the operator is not expecting a drop and gets one, along with the loss of their own SSH session
@@ -1691,6 +1695,7 @@ Major security and reliability update after several consecutive code audits. The
 - Full uninstall (`--uninstall`).
 
 [Unreleased]: https://github.com/bivlked/amneziawg-installer/compare/v5.24.0...HEAD
+[5.25.0]: https://github.com/bivlked/amneziawg-installer/compare/v5.24.0...v5.25.0
 [5.24.0]: https://github.com/bivlked/amneziawg-installer/compare/v5.23.0...v5.24.0
 [5.23.0]: https://github.com/bivlked/amneziawg-installer/compare/v5.22.0...v5.23.0
 [5.22.0]: https://github.com/bivlked/amneziawg-installer/compare/v5.21.2...v5.22.0
