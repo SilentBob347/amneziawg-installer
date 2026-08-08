@@ -33,8 +33,8 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Проверяются в step5_download_scripts() после curl.
 # Если AWG_BRANCH переопределён (не v$SCRIPT_VERSION), проверка пропускается.
 # Формат: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="7231f132c4659550f52ad8994133288b987c6bd9ac0b1b5d9978f7fb4fb7129c"
-MANAGE_SCRIPT_SHA256="dad2eea2ff4fa25a0ae0ef05942974afcf0f5a6181f152a8118d858edc9316f0"
+COMMON_SCRIPT_SHA256="0262a113b930fb50d843291b3c575bd9ffd01088dc56d578918d7ac1ca2db939"
+MANAGE_SCRIPT_SHA256="c2a34ef66905209e4fad49c637a36a99059b7d769deb45e865c238c886ae5a79"
 
 # AmneziaWG 2.0 пин (H0, 31 jul 2026). Upstream влил AmneziaWG 3.0 в default-ветку
 # amneziawg-linux-kernel-module, и PPA переключился на 3.0. Тогда на ядрах старее
@@ -3223,7 +3223,45 @@ PPASRC
     if [[ "$arch" == "aarch64" || "$arch" == "armv7l" ]]; then
         if _try_install_prebuilt_arm; then
             log "Модуль ядра установлен из предсобранного пакета. Установка утилит из PPA..."
+            # 🔴 Hold ОБЯЗАТЕЛЕН и здесь, НЕЗАВИСИМО от версии ядра. Выше он
+            # ставится только на пиновом пути (ядро < 6.7), а в ветке >= 6.7
+            # делается apt-mark unhold - и этот ARM-блок идёт ПОСЛЕ гейта.
+            # Предсобранный пакет называется amneziawg-kmod-<KERNEL_ID> и не
+            # объявляет Provides: amneziawg-modules, поэтому альтернативу из
+            # Recommends пакета amneziawg-tools (по живым метаданным PPA:
+            # "amneziawg-modules (>= 0.0.20171001) | amneziawg-dkms (>= ...)")
+            # он НЕ удовлетворяет, а самого amneziawg-modules в PPA нет.
+            # install_packages ставит через apt install -y С рекомендациями,
+            # значит без hold apt дотянул бы amneziawg-dkms из PPA, и рядом с
+            # нашим 2.0-модулем в extra/ встало бы 3.0-дерево в updates/dkms/.
+            # Два дерева с модулем ОДНОГО имени - ровно то, от чего hold нужен.
+            # Достижимо: target-ы пребилдов ubuntu-2510-arm64 и
+            # debian-trixie-arm64 - это ядра 6.7+.
+            apt-mark hold amneziawg-dkms amneziawg >/dev/null 2>&1 || true
+            if ! apt-mark showhold 2>/dev/null | grep -qx "amneziawg-dkms"; then
+                die "Не удалось зафиксировать amneziawg-dkms в hold перед установкой amneziawg-tools. Без этого рядом с предсобранным модулем встал бы модуль из PPA - два дерева с именем amneziawg. Проверьте apt/dpkg lock и запустите скрипт снова: предсобранный пакет уже установлен, шаг выполнится заново."
+            fi
             install_packages "amneziawg-tools" "wireguard-tools" "qrencode"
+            # ПОСТУСЛОВИЕ. Выше проверена ПРЕДПОСЫЛКА (hold стоит), а результат
+            # не проверял никто - между ними apt мог поставить пакет по любой
+            # причине, которую мы не предусмотрели, либо dkms остался с прошлой
+            # установки этого же хоста. Проверяем факт, а не предпосылку: именно
+            # он ловит настоящий отказ.
+            # ⚠️ Здесь НЕ die, и это осознанно: сценарий "dkms остался с прошлого
+            # прогона" - это уже сломанное состояние, но обрывать установку на
+            # нём мы не готовы без прогона на ARM-стенде, а без пути к починке
+            # обрыв оставит человека ни с чем. Поэтому громкое предупреждение с
+            # точной командой. Ужесточение до die - отдельная задача.
+            if dpkg-query -W -f='${Status}' amneziawg-dkms 2>/dev/null | grep -q "ok installed"; then
+                log_warn "ВНИМАНИЕ: рядом с предсобранным модулем в системе стоит пакет amneziawg-dkms."
+                log_warn "  Чем это кончится - измерено на стенде, а не предположено: как только в"
+                log_warn "  системе окажутся kernel-headers, DKMS соберётся, ВЫТЕСНИТ файл пребилда из"
+                log_warn "  extra/ и после перезагрузки загрузится он, то есть сервер молча перейдёт"
+                log_warn "  на другую линию протокола. Туннель при этом работать не перестанет, а"
+                log_warn "  dpkg продолжит считать предсобранный пакет установленным."
+                log_warn "  Убрать лишнее: sudo apt-mark unhold amneziawg-dkms && sudo apt-get purge -y amneziawg-dkms"
+                log_warn "  затем sudo apt-mark hold amneziawg-dkms, переустановка модуля и перезагрузка."
+            fi
             log "Шаг 2 завершен (prebuilt ARM)."
             # request_reboot всегда завершает процесс (exit), сюда не вернёмся.
             request_reboot 3
@@ -3879,6 +3917,10 @@ step7_start_service() {
     else
         systemctl enable --now awg-quick@awg0 || die "Ошибка enable --now."
     fi
+    # Интерфейс только что поднят - фиксируем набор device-параметров, чтобы
+    # управляющий скрипт с самого начала знал, что стоит на живом интерфейсе.
+    # Без этого первое же обнаружение снятия сравнивать было бы не с чем.
+    awg_record_device_params
     log "Сервис включен и запущен."
 
     log "Проверка статуса сервиса..."

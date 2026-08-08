@@ -171,9 +171,11 @@ In late July 2026 the Amnezia team released **AmneziaWG 3.0** and switched the P
 To see what you actually have:
 
 ```bash
-awg --version                        # amneziawg-tools v3.0.20260730
-modinfo amneziawg | grep ^version    # version: 3.0.20260731-04
+awg --version                          # amneziawg-tools v3.0.20260730
+cat /sys/module/amneziawg/version      # 3.0.20260731-04 - version of the LOADED module
 ```
+
+⚠️ Ask the loaded module, not the file on disk. `modinfo amneziawg | grep ^version` reads the metadata of whichever `.ko` was selected on disk, so if a host ends up with two trees carrying a module of the same name (possible on ARM: the pinned 2.0 in `extra/` and DKMS 3.0 in `updates/dkms/`), it names the one that is not running in the kernel. `modinfo` is useful in exactly one case - when the module is not loaded and `/sys/module/amneziawg/` is absent; then it shows what sits on disk. Since v5.25.0 `manage check` and `manage diagnose` ask the loaded module and fall back to `modinfo` only as a second path.
 
 ⚠️ The apt package versions do not answer this. There `amneziawg-dkms` reads as `1.0.0-0~202608010147+c78a89e~ubuntu24.04.1` and `amneziawg-tools` as `1.0.20210914-0~...`: the leading part is packaging, the real content is the commit hash in the suffix. The two commands above answer directly.
 
@@ -192,6 +194,12 @@ That last row is not hypothetical: prebuilt ARM packages are built for Raspberry
 On older kernels we pick 2.0 **on purpose**, not because 3.0 fails to build there. For the first day after the release it genuinely did fail on kernel 6.1; upstream fixed that on 31 July and it builds now. But old kernels are exactly where the 3.0 line has had the least mileage, while the pinned 2.0 is verified against an immutable commit. The threshold will be lifted after a separate validation, not because the build passes again.
 
 On ARM the installer tries the prebuilt package first, and if it finds one matching your kernel it never reaches the PPA at all. The prebuilt packages are pinned to 2.0. With no match, the same rule as on x86 takes over: a kernel older than 6.7 gets the pinned 2.0 from source, a newer one gets the PPA module.
+
+> ⚠️ **The pinned 2.0 line does not receive updates, and that is a deliberate decision rather than an oversight.** The module on the pinned path is built from the immutable tag `v1.0.20260725`, and upstream has frozen the `1.0.x` line - there will be no new releases in it. The same applies to the prebuilt ARM packages.
+>
+> What that means in practice. On Debian 12 with its stock 6.1 kernel, and on ARM with a matching prebuilt package, you get a proven but frozen module. There is no "upgrade to the third version with a plain `apt upgrade`" path for such hosts: the installer keeps `amneziawg-dkms` on `apt-mark hold` precisely so the PPA module does not land next to it as a second tree with the same name. Nothing breaks and nothing stops working - updates simply do not arrive.
+>
+> If you specifically need the third version on such a host, there is one supported route: get a kernel 6.7 or newer (on Debian 12 that means the backports kernel) and reinstall. On x86 the normal PPA path takes over from there. ⚠️ On ARM, mind the order: the prebuilt package is tried first, so if a prebuilt exists for your new kernel you will get the pinned 2.0 again - the third version arrives only when no match is found.
 
 <a id="awg3-wire-adv"></a>
 ### What 3.0 changes on the wire, and what it does not
@@ -248,6 +256,8 @@ echo "module amneziawg -p" > /sys/kernel/debug/dynamic_debug/control
 ```
 
 **A parameter cannot be removed with `awg setconf` or `awg syncconf`.** Drop the line from the config, apply it again, and the value stays: for AWG parameters these commands only add. Getting an interface back to a clean state means recreating it, that is `systemctl restart awg-quick@awg0` (or `awg-quick down` then `up`).
+
+Since v5.25.0 the management scripts track this and **warn**: they remember the set of interface parameters applied last time, and if a parameter has disappeared from `awg0.conf`, the log gets a `Removed from the [Interface] section: S1` warning along with the command that carries the removal through to the live interface. The script does **not** restart on its own: that would drop every client connection, and a decision with that price belongs to a person rather than to automation. The warning normally appears once: the snapshot is refreshed after a successful apply, and also after `manage restart`, `manage restore` and an install, that is after everything that recreates the interface. If the apply failed, the snapshot stays as it was and the warning repeats on the next run - deliberately, because otherwise a failure would silently mute the reminder that the parameter is still on the live interface. Parameter values are still applied without a restart: `syncconf` changes those correctly, the problem is only removal.
 
 <a id="awg3-not-yet-adv"></a>
 ### What the installer does not enable yet, and why

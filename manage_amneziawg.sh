@@ -957,6 +957,10 @@ restore_backup() {
 
     # Успех — rollback не нужен, trap выполнит только cleanup
     _restore_ok=1
+    # Восстановление подменило awg0.conf и пересоздало интерфейс, поэтому снимок
+    # набора device-параметров надо взять заново: он должен описывать то, что
+    # стоит на живом интерфейсе СЕЙЧАС, а не до восстановления.
+    awg_record_device_params
     log "Восстановление завершено."
     return 0
 }
@@ -1224,7 +1228,9 @@ check_server() {
         # Версия модуля: у линии 3.0 строка начинается с 3., у 2.0 - с 1.
         # (имена тегов upstream исторически не совпадают с версией протокола,
         #  поэтому печатаем сырое значение и не выводим протокол по догадке).
-        _c_mod_ver=$(modinfo amneziawg 2>/dev/null | awk '/^version:/{print $2; exit}')
+        # awg_module_version спрашивает ЗАГРУЖЕННЫЙ модуль, а modinfo (файл на
+        # диске) оставляет вторым путём - см. пояснение у функции в awg_common.sh.
+        _c_mod_ver=$(awg_module_version)
         if [[ -n "$_c_mod_ver" ]]; then
             log " - Модуль amneziawg загружен (версия $_c_mod_ver)."
         else
@@ -1350,7 +1356,7 @@ diagnose_server() {
     # 1. Kernel module
     if lsmod 2>/dev/null | awk '$1 == "amneziawg" {f=1} END {exit !f}'; then
         local _d_mod_ver
-        _d_mod_ver=$(modinfo amneziawg 2>/dev/null | awk '/^version:/{print $2; exit}')
+        _d_mod_ver=$(awg_module_version)
         if [[ "$_d_mod_ver" == 3.* ]]; then
             _diag_line OK "Модуль ядра amneziawg загружен (AmneziaWG 3.0, $_d_mod_ver)"
         elif [[ -n "$_d_mod_ver" ]]; then
@@ -2270,6 +2276,9 @@ case $COMMAND in
 
     restart)
         log "Перезапуск сервиса..."
+        # Предупреждение ДО confirm_action: при --yes/AWG_YES=1 подтверждения не
+        # будет, а отрезать себя от сервера можно и неинтерактивным запуском.
+        awg_warn_interface_disruption
         if ! confirm_action "перезапустить" "сервис"; then exit 1; fi
         # Перед systemctl restart убеждаемся, что модуль ядра загружен (mode=module-only,
         # т.к. сам systemctl ниже стартует unit явно — повторный start от ensure избыточен).
@@ -2282,6 +2291,11 @@ case $COMMAND in
             while IFS= read -r line; do log_error "  $line"; done <<< "$status_out"
             exit 1
         else
+            # Интерфейс пересоздан - снимок набора device-параметров обязан
+            # догнать конфиг. Иначе apply_config сравнивал бы с устаревшим
+            # набором и либо предупреждал впустую, либо ПРОПУСТИЛ бы будущее
+            # снятие молча (если этим перезапуском параметр как раз добавили).
+            awg_record_device_params
             log "Сервис перезапущен."
             _jactive=false
             systemctl is-active --quiet awg-quick@awg0 2>/dev/null && _jactive=true

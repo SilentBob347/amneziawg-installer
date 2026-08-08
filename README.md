@@ -124,8 +124,11 @@ sudo bash ./install_amneziawg.sh --yes --route-all
 Посмотреть, что стоит именно у вас:
 
 ```bash
-awg --version && modinfo amneziawg | grep ^version
+awg --version                        # версия утилит
+cat /sys/module/amneziawg/version    # версия загруженного модуля
 ```
+
+Если модуль не загружен, вторая команда ничего не покажет - тогда версию файла на диске выдаст `modinfo amneziawg | grep ^version`. Подробнее о том, почему это разные вопросы, - в [ADVANCED.md](ADVANCED.md#awg3-adv).
 
 На ядрах старее 6.7 (Debian 12 с 6.1) и на ARM, где есть готовый пакет под ваше ядро, ставится проверенная 2.0: там третья версия обкатана меньше всего, и порог мы держим сознательно.
 

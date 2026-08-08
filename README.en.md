@@ -123,8 +123,11 @@ Works on Ubuntu 24.04/25.10/26.04 and Debian 12/13. Any cheap VPS with 1 GB RAM 
 To see what you actually have:
 
 ```bash
-awg --version && modinfo amneziawg | grep ^version
+awg --version                        # tools version
+cat /sys/module/amneziawg/version    # version of the loaded module
 ```
+
+If the module is not loaded the second command prints nothing - then `modinfo amneziawg | grep ^version` reports the version of the file on disk. Why these are different questions is explained in [ADVANCED.en.md](ADVANCED.en.md#awg3-adv).
 
 Kernels older than 6.7 (Debian 12 on 6.1) and ARM hosts with a prebuilt package for their kernel still get the proven 2.0: that is where the 3.0 line has had the least mileage, and the threshold is deliberate.
 

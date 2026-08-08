@@ -78,6 +78,10 @@ _run_check() {
     local port_value="$1" src="${2:-$BATS_TEST_DIRNAME/../manage_amneziawg.sh}"
     # v5.21.2: _sanitize_port lives in awg_common*.sh now; check_server and the
     # JSON helpers still come from the manage script under test.
+    # Same reason for awg_module_version: check_server asks it for the module
+    # version, and it lives in awg_common*.sh. Without injecting it the harness
+    # printed "command not found" into stdout and the JSON envelope stopped
+    # parsing - the failure looked like a JSON bug rather than a missing stub.
     local common_src="${src/manage_amneziawg/awg_common}"
     PATH="$STUB_BIN:$PATH" \
     AWG_DIR="$AWG_DIR" CONFIG_FILE="$CONFIG_FILE" SERVER_CONF_FILE="$SERVER_CONF_FILE" \
@@ -92,6 +96,7 @@ _run_check() {
         JSON_OUTPUT=1
         _JSON_EMITTED=0
         '"$(awk '/^_sanitize_port\(\) \{/,/^\}/' "$common_src")"'
+        '"$(awk '/^awg_module_version\(\) \{/,/^\}/' "$common_src")"'
         '"$(awk '/^_json_utf8_sanitize\(\) \{/,/^\}/' "$src")"'
         '"$(awk '/^json_escape\(\) \{/,/^\}/' "$src")"'
         '"$(awk '/^json_out\(\) \{/,/^\}/' "$src")"'
@@ -157,6 +162,7 @@ _run_check() {
             JSON_OUTPUT=1
             _JSON_EMITTED=0
             '"$(awk '/^_sanitize_port\(\) \{/,/^\}/' "$BATS_TEST_DIRNAME/../awg_common.sh")"'
+            '"$(awk '/^awg_module_version\(\) \{/,/^\}/' "$BATS_TEST_DIRNAME/../awg_common.sh")"'
             '"$(awk '/^_json_utf8_sanitize\(\) \{/,/^\}/' "$BATS_TEST_DIRNAME/../manage_amneziawg.sh")"'
             '"$(awk '/^json_escape\(\) \{/,/^\}/' "$BATS_TEST_DIRNAME/../manage_amneziawg.sh")"'
             '"$(awk '/^json_out\(\) \{/,/^\}/' "$BATS_TEST_DIRNAME/../manage_amneziawg.sh")"'

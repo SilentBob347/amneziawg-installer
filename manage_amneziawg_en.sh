@@ -971,6 +971,10 @@ restore_backup() {
 
     # Success — rollback not needed, trap only performs cleanup
     _restore_ok=1
+    # The restore replaced awg0.conf and recreated the interface, so the
+    # device-parameter snapshot has to be taken again: it must describe what is
+    # on the live interface NOW, not what was there before the restore.
+    awg_record_device_params
     log "Restore completed."
     return 0
 }
@@ -1238,7 +1242,9 @@ check_server() {
         # Module version: the 3.0 line starts with 3., the 2.0 one with 1.
         # (upstream tag names have never tracked the protocol version, so we
         #  print the raw value instead of guessing the protocol from it).
-        _c_mod_ver=$(modinfo amneziawg 2>/dev/null | awk '/^version:/{print $2; exit}')
+        # awg_module_version asks the LOADED module and keeps modinfo (the file
+        # on disk) as the second path - see the note at the function in awg_common.sh.
+        _c_mod_ver=$(awg_module_version)
         if [[ -n "$_c_mod_ver" ]]; then
             log " - amneziawg module is loaded (version $_c_mod_ver)."
         else
@@ -1364,7 +1370,7 @@ diagnose_server() {
     # 1. Kernel module
     if lsmod 2>/dev/null | awk '$1 == "amneziawg" {f=1} END {exit !f}'; then
         local _d_mod_ver
-        _d_mod_ver=$(modinfo amneziawg 2>/dev/null | awk '/^version:/{print $2; exit}')
+        _d_mod_ver=$(awg_module_version)
         if [[ "$_d_mod_ver" == 3.* ]]; then
             _diag_line OK "Kernel module amneziawg loaded (AmneziaWG 3.0, $_d_mod_ver)"
         elif [[ -n "$_d_mod_ver" ]]; then
@@ -2284,6 +2290,9 @@ case $COMMAND in
 
     restart)
         log "Restarting service..."
+        # Warn BEFORE confirm_action: with --yes/AWG_YES=1 there is no prompt, and
+        # a non-interactive run can cut you off from the server just as well.
+        awg_warn_interface_disruption
         if ! confirm_action "restart" "service"; then exit 1; fi
         # Verify kernel module is loaded before systemctl restart (mode=module-only —
         # the restart below starts the unit explicitly, so an extra start from ensure
@@ -2297,6 +2306,11 @@ case $COMMAND in
             while IFS= read -r line; do log_error "  $line"; done <<< "$status_out"
             exit 1
         else
+            # The interface has been recreated, so the device-parameter snapshot
+            # must catch up with the config. Otherwise apply_config would compare
+            # against a stale set and either warn for nothing or MISS a future
+            # removal silently (if this restart is what added the parameter).
+            awg_record_device_params
             log "Service restarted."
             _jactive=false
             systemctl is-active --quiet awg-quick@awg0 2>/dev/null && _jactive=true

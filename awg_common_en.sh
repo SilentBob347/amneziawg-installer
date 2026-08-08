@@ -463,6 +463,51 @@ generate_awg_h_ranges() {
 # ==============================================================================
 # DKMS / amneziawg kernel module auto-recovery
 # ==============================================================================
+
+# awg_module_version : version of the amneziawg module (empty string if it
+# cannot be determined). Asks the LOADED module first, the file second.
+#
+# ⚠️ Why not just modinfo: modinfo reads the metadata of the .ko that was
+# SELECTED on disk via modules.dep, not of the object running in the kernel.
+# Normally these are the same, which is why the divergence never surfaced. But
+# if a host ends up with TWO trees carrying a module of the same name - the
+# pinned 2.0 in extra/ and DKMS 3.0 in updates/dkms/ - modinfo reports whichever
+# won the search order, while a different one may be loaded (for instance the
+# previous one, before a reboot). Our own diagnostics would then name a version
+# that is not in the kernel.
+# /sys/module/amneziawg/version reflects exactly what is loaded, and it exists
+# in BOTH lines: MODULE_VERSION(WIREGUARD_VERSION) is declared in src/main.c in
+# the pinned 2.0 tag as well as in 3.0.
+# modinfo stays as the second path - it works when the module is not loaded.
+#
+# AWG_MODULE_VERSION_PATH is overridden by tests (bats) only: /sys cannot be
+# faked otherwise, and the priority "loaded beats file" is exactly what needs
+# verifying.
+awg_module_version() {
+    local ver="" sysfile="${AWG_MODULE_VERSION_PATH:-/sys/module/amneziawg/version}"
+    if [[ -r "$sysfile" ]]; then
+        # ⚠️ `|| true`, NOT `|| ver=""`: on a file without a trailing newline
+        # read returns 1 having ALREADY assigned what it read. Resetting to an
+        # empty string would wipe a correct value and silently fall to modinfo.
+        # ⚠️ And `2>/dev/null` comes BEFORE `<`, not after: redirections are
+        # applied left to right, so with the opposite order a file-open error
+        # still reaches the original stderr - verified, a raw `bash: ...` line
+        # appeared in the middle of `manage check` output.
+        IFS= read -r ver 2>/dev/null < "$sysfile" || true
+        ver="${ver//[[:space:]]/}"
+        # 🔴 The file was readable, so answer with what it gave, even if that
+        # is empty, and do NOT fall through to modinfo. Substituting the on-disk
+        # answer is exactly what this function exists to avoid: with two trees
+        # modinfo names a version that is not in the kernel, and diagnose would
+        # then declare a protocol line from it. An empty version is more honest
+        # than a wrong one - consumers print the line without a version.
+        printf '%s' "$ver"
+        return 0
+    fi
+    ver=$(modinfo amneziawg 2>/dev/null | awk '/^version:/{print $2; exit}')
+    printf '%s' "$ver"
+}
+
 #
 # After an apt kernel upgrade the DKMS module must be rebuilt for the new
 # kernel. If that did not happen automatically (or the module was unbound),
@@ -1517,6 +1562,223 @@ EOF
 }
 
 # ==============================================================================
+# Operations that restart the interface: warning and reversibility
+# ==============================================================================
+
+# awg_ssh_client_addr : source address of the current SSH session (empty if this
+# is not SSH or it cannot be determined).
+#
+# ⚠️ $SSH_CONNECTION alone is NOT ENOUGH: the script is run through sudo, sudo
+# does env_reset by default, and SSH_CONNECTION is not in the Debian/Ubuntu
+# env_keep list. Hence the second path - who, matched against our own tty.
+# who may report a hostname instead of an address (with UseDNS yes); the subnet
+# comparison then cannot be made, and the caller gets "could not determine",
+# which is more honest than guessing.
+awg_ssh_client_addr() {
+    local from_tty="" from_env="" mytty
+    mytty=$(ps -o tty= -p $$ 2>/dev/null | tr -d '[:space:]')
+    if [[ -n "$mytty" && "$mytty" != "?" ]]; then
+        from_tty=$(who 2>/dev/null | awk -v t="$mytty" '
+            $2 == t && match($0, /\(([^)]+)\)/) {
+                print substr($0, RSTART + 1, RLENGTH - 2); exit
+            }')
+    fi
+    [[ -n "${SSH_CONNECTION:-}" ]] && from_env="${SSH_CONNECTION%% *}"
+    # ⚠️ Data keyed on OUR tty wins over the inherited variable.
+    # SSH_CONNECTION comes from the environment, and in a reattached tmux/screen
+    # session it can point at the PREVIOUS connection - we would then produce a
+    # confidently wrong verdict. utmp keyed on our own tty describes the current
+    # one. But if the tty path yielded something that is not an address (with
+    # UseDNS yes it will be a hostname), take the variable: a usable address
+    # beats an honest "unknown".
+    if _valid_ipv4 "$from_tty" 2>/dev/null; then
+        printf '%s' "$from_tty"
+    elif _valid_ipv4 "$from_env" 2>/dev/null; then
+        printf '%s' "$from_env"
+    elif [[ -n "$from_tty" ]]; then
+        printf '%s' "$from_tty"
+    else
+        printf '%s' "$from_env"
+    fi
+}
+
+# awg_session_via_tunnel : is the current session going THROUGH the VPN tunnel.
+#   0 - yes, the source address is inside the tunnel subnet (a restart will cut
+#       off access);
+#   1 - no, the address is outside the subnet;
+#   2 - could not determine (not SSH, address not IPv4, subnet not parsed).
+# Three states rather than two, deliberately: "unknown" and "not through the
+# tunnel" need DIFFERENT wording, and collapsing them into 1 would present a
+# guess as a fact.
+# _awg_tunnel_subnet : the tunnel subnet as addr/prefix, or an empty string.
+#
+# 🔴 THERE IS DELIBERATELY NO DEFAULT HERE, and that fixes a critical defect.
+# An earlier revision substituted the literal 10.9.9.1/24, while manage does NOT
+# load awgsetup_cfg.init on the restart path - so AWG_TUNNEL_SUBNET is empty
+# there. For anyone who installed with --subnet, a session from their own subnet
+# (say 10.66.66.2) was compared against a foreign 10.9.9.0/24 and declared "not
+# through the tunnel": the script confidently asserted THE OPPOSITE OF THE TRUTH
+# in exactly the scenario the check was written for, and showed neither the
+# warning nor the hint about the provider console. A substituted literal turns
+# "there is no data" into "there is data, and it says this".
+#
+# Sources by descending trustworthiness: the live interface, the server config,
+# the variable (which load_awg_params sets on other paths). Nothing found means
+# empty, and the caller must say "unknown" rather than guess.
+_awg_tunnel_subnet() {
+    local out=""
+    out=$(ip -4 -o addr show awg0 2>/dev/null \
+        | awk '{ for (i = 1; i <= NF; i++) if ($i == "inet") { print $(i + 1); exit } }')
+    if [[ -z "$out" && -r "$SERVER_CONF_FILE" ]]; then
+        out=$(awk '
+            /^[[:space:]]*#/ { next }
+            /^[[:space:]]*\[/ { inif = (tolower($0) ~ /^[[:space:]]*\[interface\]/) ? 1 : 0; next }
+            inif && tolower($0) ~ /^[[:space:]]*address[[:space:]]*=/ {
+                sub(/^[^=]*=[[:space:]]*/, "")
+                n = split($0, parts, ",")
+                for (i = 1; i <= n; i++) {
+                    gsub(/[[:space:]]/, "", parts[i])
+                    if (parts[i] ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+$/) { print parts[i]; exit }
+                }
+            }' "$SERVER_CONF_FILE")
+    fi
+    [[ -z "$out" && -n "${AWG_TUNNEL_SUBNET:-}" ]] && out="$AWG_TUNNEL_SUBNET"
+    printf '%s' "$out"
+}
+
+awg_session_via_tunnel() {
+    local addr="${1:-}" subnet net_int bcast_int addr_int
+    [[ -n "$addr" ]] || addr="$(awg_ssh_client_addr)"
+    [[ -n "$addr" ]] || return 2
+    [[ "$addr" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || return 2
+    subnet="$(_awg_tunnel_subnet)"
+    [[ -n "$subnet" ]] || return 2
+    # 🔴 A /31 or /32 prefix carries no host range, so it cannot answer our
+    # question: any address other than the server one lands "outside the
+    # subnet", and we would confidently tell someone sitting in the tunnel
+    # that access is unaffected. Our generator writes /16../30, but the live
+    # interface path inherits WHATEVER prefix is there, and /32 in
+    # [Interface] is common WireGuard practice. Answer "unknown" (verified).
+    [[ "${subnet##*/}" =~ ^[0-9]+$ ]] || return 2
+    (( 10#${subnet##*/} <= 30 )) || return 2
+    read -r net_int bcast_int < <(_cidr_bounds "$subnet" 2>/dev/null) || return 2
+    [[ -n "$net_int" && -n "$bcast_int" ]] || return 2
+    addr_int="$(_ipv4_to_int "$addr" 2>/dev/null)" || return 2
+    [[ -n "$addr_int" ]] || return 2
+    (( addr_int >= net_int && addr_int <= bcast_int )) && return 0
+    return 1
+}
+
+# awg_warn_interface_disruption : warn BEFORE an operation that restarts the
+# interface. Call it before confirm_action so the warning is visible with --yes
+# as well (a non-interactive run can cut people off from the server too).
+awg_warn_interface_disruption() {
+    local rc addr subnet
+    log_warn "The awg0 interface will be restarted - every client connection drops for a few seconds."
+    # Ask for the address ONCE and pass it into the check: two independent
+    # calls could give a verdict about one address and text about another.
+    addr="$(awg_ssh_client_addr)"
+    # The subnet is resolved ONCE and BEFORE the verdict as well: an earlier
+    # revision asked for it a second time afterwards, so the printed subnet
+    # could differ from the one the verdict was based on.
+    subnet="$(_awg_tunnel_subnet)"
+    # rc is taken with `|| rc=$?` rather than `cmd; rc=$?`: under set -e the
+    # latter aborts the function on a non-zero status, cutting the warning off
+    # halfway. The repository does contain an embedded script with set -euo
+    # pipefail, so this is not hypothetical.
+    rc=0
+    awg_session_via_tunnel "$addr" || rc=$?
+    case "$rc" in
+        0)
+            log_warn "WARNING: it looks like you are connected to this server THROUGH this very VPN."
+            log_warn "  Your session address $addr belongs to the tunnel subnet ${subnet},"
+            log_warn "  so the current connection will drop after the restart."
+            log_warn "  If access does not come back on its own, use the console or VNC in your"
+            log_warn "  provider's panel: it works independently of the VPN."
+            ;;
+        1)
+            log_debug "Session is not going through the tunnel (address $addr) - server access is unaffected."
+            ;;
+        *)
+            log_warn "  If you are connected to this server THROUGH this VPN, you will lose access."
+            log_warn "  The fallback for that case is the console or VNC in your provider's panel."
+            ;;
+    esac
+}
+
+# _awg_device_param_names : names of the AWG device parameters (2.0 and 3.0)
+# that live in the [Interface] section and that syncconf does NOT clear.
+_awg_device_param_names() {
+    printf '%s\n' Jc Jmin Jmax S1 S2 S3 S4 H1 H2 H3 H4 I1 I2 I3 I4 I5 \
+        ContentPaddingAddition HeaderProtectionKey MaxHandshakeAttempts \
+        KeepaliveTimeout RejectAfterTime RekeyAfterTime RekeyTimeout
+}
+
+# _awg_device_params_fingerprint [config] : sorted list of device parameter
+# NAMES present in the [Interface] section, on a single line.
+# Names only: syncconf applies values correctly, the problem is exactly removal.
+_awg_device_params_fingerprint() {
+    local conf="${1:-$SERVER_CONF_FILE}" known
+    [[ -r "$conf" ]] || return 1
+    known="$(_awg_device_param_names | tr '\n' '|')"
+    known="${known%|}"
+    awk -v known="$known" '
+        BEGIN { n = split(known, k, "|"); for (i = 1; i <= n; i++) low[tolower(k[i])] = k[i] }
+        /^[[:space:]]*#/ { next }
+        /^[[:space:]]*\[/ { inif = (tolower($0) ~ /^[[:space:]]*\[interface\]/) ? 1 : 0; next }
+        inif && /=/ {
+            name = $1
+            sub(/[[:space:]]*=.*$/, "", name)
+            gsub(/[[:space:]]/, "", name)
+            if (tolower(name) in low) print low[tolower(name)]
+        }
+    ' "$conf" | sort -u | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+}
+
+# _awg_save_device_params <state file> <fingerprint> : remember the applied set.
+# The file lives in AWG_DIR (root-only); losing it degrades gracefully - the
+# next check simply does not fire, and no spurious restart happens.
+# The write is ATOMIC (temp + mv): a truncated write would leave a half-empty
+# snapshot, which reads as "the parameters were removed" and produces a false
+# warning. A failure is not swallowed entirely - it goes to debug, otherwise a
+# silent loss of state would look like success.
+_awg_save_device_params() {
+    local state="$1" fp="$2" tmp="${1}.tmp"
+    if ! printf '%s\n' "$fp" > "$tmp" 2>/dev/null; then
+        rm -f "$tmp" 2>/dev/null
+        log_warn "Failed to write the interface parameter snapshot ($state) - check free space and permissions."
+        return 0
+    fi
+    chmod 600 "$tmp" 2>/dev/null || true
+    if ! mv -f "$tmp" "$state" 2>/dev/null; then
+        rm -f "$tmp" 2>/dev/null
+        log_warn "Failed to replace the interface parameter snapshot ($state) - check free space and permissions."
+    fi
+    return 0
+}
+
+# awg_record_device_params : remember which set of device parameters the config
+# holds RIGHT NOW. Call it AFTER a successful apply or interface recreation - the
+# snapshot has to mean "what is actually on the live interface", otherwise
+# removal detection starts lying in both directions.
+#
+# 🔴 Two rules, each closing a defect found in review:
+# 1. The fingerprint is recomputed rather than reusing the one taken before the
+#    apply: if the file was being rewritten at that moment, what was computed was
+#    incomplete, and saving it would have frozen a wrong set.
+# 2. An EMPTY set is NEVER written. An empty snapshot disables the check forever
+#    (nothing to compare against), and emptiness almost always means a partially
+#    read file: our generator always writes Jc/S/H. Keeping the previous good
+#    snapshot is better.
+awg_record_device_params() {
+    local state="${AWG_DIR}/.awg_device_params" fp
+    [[ -r "$SERVER_CONF_FILE" ]] || return 0
+    fp="$(_awg_device_params_fingerprint "$SERVER_CONF_FILE" 2>/dev/null)" || return 0
+    [[ -n "$fp" ]] || return 0
+    _awg_save_device_params "$state" "$fp"
+}
+
+# ==============================================================================
 # Config application (syncconf)
 # ==============================================================================
 
@@ -1543,30 +1805,114 @@ apply_config() {
 
     local rc=0
 
+    # 🔴 syncconf DOES NOT CLEAR AWG device parameters. Verified on module
+    # 3.0.20260731-04: Jc/S4/H1/I1/ContentPaddingAddition/RekeyAfterTime that had
+    # been set stayed on the live interface after applying a config without them.
+    # The WireGuard semantics ("setconf = the complete picture") does not hold for
+    # AWG parameters, it is additive. So the operation "remove a parameter from
+    # awg0.conf and apply" would silently not work: the file changes, the
+    # interface does not, and nothing catches that divergence. A parameter can
+    # only be cleared by recreating the interface, i.e. by restarting the service.
+    #
+    # We compare the SET OF NAMES against what was applied last time, not against
+    # the live interface: `awg showconf` prints neutral values too (S4 = 0,
+    # H1 = 1), so comparing with it would produce false positives on every apply.
+    # Values are not compared at all - syncconf applies those correctly, the
+    # problem is exactly removal.
+    # No state (first install, lost file) - stay quiet: there is nothing to
+    # compare against, and guessing at a warning is worse than not warning.
+    local params_state="${AWG_DIR}/.awg_device_params"
+    local now_fp="" prev_fp="" removed=""
+    if [[ -r "$SERVER_CONF_FILE" ]]; then
+        # The path is passed explicitly even though it is also the default:
+        # otherwise shellcheck 0.9 (the version CI installs) rightly raises
+        # SC2120 about a parameter nobody ever passes.
+        now_fp="$(_awg_device_params_fingerprint "$SERVER_CONF_FILE" 2>/dev/null)" || now_fp=""
+        [[ -r "$params_state" ]] && IFS= read -r prev_fp 2>/dev/null < "$params_state"
+        # ⚠️ An empty set against a non-empty previous one is NOT treated as
+        # "everything was removed". Our generator always writes Jc/S/H, so
+        # emptiness means a partially read or currently rewritten file rather
+        # than a real cleanup. Stay quiet: a false alarm costs more here than a
+        # missed one.
+        if [[ -n "$prev_fp" && -n "$now_fp" ]]; then
+            local _p
+            for _p in $prev_fp; do
+                [[ " $now_fp " == *" $_p "* ]] || removed+="${removed:+, }$_p"
+            done
+        fi
+    fi
+
     if [[ "${AWG_APPLY_MODE:-syncconf}" == "restart" ]]; then
+        # An explicit restart mode drops client connections, SSH through the
+        # tunnel included, so warn exactly as manage restart does.
+        awg_warn_interface_disruption
         log "Restarting service (apply-mode=restart)..."
         systemctl restart awg-quick@awg0 2>/dev/null; rc=$?
-        [[ $rc -ne 0 ]] && log_warn "Service restart error."
+        if [[ $rc -ne 0 ]]; then
+            log_warn "Service restart error."
+        else
+            awg_record_device_params
+        fi
         exec {apply_fd}>&-
         return $rc
+    fi
+
+    # 🔴 A detected removal is NOT restarted for you - it is reported.
+    # The first revision of this change restarted the service automatically, and
+    # that was WORSE than the trap it closed: a restart drops EVERY client
+    # connection, and the state can fall behind through no fault of the user.
+    # Example: someone drops the line and applies it with `manage restart` - the
+    # interface is already recreated and the parameter already cleared, but the
+    # snapshot still holds the old set, so the next ordinary `add` would see the
+    # "removal" a second time and cut everyone off again. A false warning costs
+    # a log line; a false restart costs everyone's connection. So we speak, and
+    # the human decides.
+    # ⚠️ The snapshot is NOT updated here. It is updated only AFTER a successful
+    # apply, below. An earlier revision updated it right away, and that silenced
+    # the warning forever whenever the apply then failed: the state had already
+    # "caught up" with the file while nothing had changed on the live interface.
+    if [[ -n "$removed" ]]; then
+        log_warn "Removed from the [Interface] section: ${removed}."
+        log_warn "  syncconf does NOT clear such parameters - they stay on the live interface."
+        log_warn "  To make the removal take effect the interface has to be recreated:"
+        log_warn "    systemctl restart awg-quick@awg0"
+        log_warn "  That drops every client connection for a few seconds, which is why we do"
+        log_warn "  not do it for you. If you have already restarted the service by hand, this"
+        log_warn "  warning can be ignored: after a successful apply the snapshot is"
+        log_warn "  refreshed and this line will not appear on later runs."
     fi
 
     local strip_out
     strip_out=$(timeout 10 awg-quick strip awg0 2>/dev/null) || {
         log_warn "awg-quick strip failed or timed out, falling back to full restart."
+        # This restart is NOT expected: the person ran a routine add/remove.
+        # It drops every client, so warn here too, not only in explicit mode.
+        awg_warn_interface_disruption
         systemctl restart awg-quick@awg0 2>/dev/null; rc=$?
-        [[ $rc -ne 0 ]] && log_warn "Service restart error."
+        if [[ $rc -ne 0 ]]; then
+            log_warn "Service restart error."
+        else
+            awg_record_device_params
+        fi
         exec {apply_fd}>&-
         return $rc
     }
     echo "$strip_out" | timeout 10 awg syncconf awg0 /dev/stdin 2>/dev/null || {
         log_warn "awg syncconf failed or timed out, falling back to full restart."
+        # As above: an unplanned restart cuts off everyone, including an SSH
+        # session through the tunnel - that has to be said before, not after.
+        awg_warn_interface_disruption
         systemctl restart awg-quick@awg0 2>/dev/null; rc=$?
-        [[ $rc -ne 0 ]] && log_warn "Service restart error."
+        if [[ $rc -ne 0 ]]; then
+            log_warn "Service restart error."
+        else
+            awg_record_device_params
+        fi
         exec {apply_fd}>&-
         return $rc
     }
     log_debug "Config applied (syncconf)."
+    awg_record_device_params
     exec {apply_fd}>&-
     return 0
 }

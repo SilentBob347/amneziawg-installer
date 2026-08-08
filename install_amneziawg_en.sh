@@ -33,8 +33,8 @@ MANAGE_SCRIPT_PATH="$AWG_DIR/manage_amneziawg.sh"
 # Verified in step5_download_scripts() after curl.
 # Verification is skipped when AWG_BRANCH is overridden (test branch).
 # Format: sha256sum output (hex, 64 chars).
-COMMON_SCRIPT_SHA256="e5d98896dadeaf99a1dff50b1421d74d149a4ccd3fa1217b22b7a21f397c21b4"
-MANAGE_SCRIPT_SHA256="12fefae1c4a5ea10415907a99d43e212ee0785be3d2085408b144c4b894e5517"
+COMMON_SCRIPT_SHA256="8bbfcb5b14d5d51541e040a3f2c6ea76c65568ff6b740d9f86de4315b35bf298"
+MANAGE_SCRIPT_SHA256="77eca1d7965d05e477431e3696dccad1215367f8aafe1d1ec02d63b17a255643"
 
 # AmneziaWG 2.0 pin (H0, 31 jul 2026). Upstream merged AmneziaWG 3.0 into the
 # amneziawg-linux-kernel-module default branch, and the PPA switched to it. Back
@@ -3263,7 +3263,47 @@ PPASRC
     if [[ "$arch" == "aarch64" || "$arch" == "armv7l" ]]; then
         if _try_install_prebuilt_arm; then
             log "Prebuilt kernel module installed. Installing userspace tools from PPA..."
+            # 🔴 The hold is REQUIRED here too, REGARDLESS of the kernel version.
+            # Above it is set only on the pinned path (kernel < 6.7), while the
+            # >= 6.7 branch does apt-mark unhold - and this ARM block runs AFTER
+            # that gate. The prebuilt package is named amneziawg-kmod-<KERNEL_ID>
+            # and declares no "Provides: amneziawg-modules", so it does NOT
+            # satisfy the alternative in amneziawg-tools' Recommends (live PPA
+            # metadata: "amneziawg-modules (>= 0.0.20171001) | amneziawg-dkms
+            # (>= ...)"), and amneziawg-modules itself is absent from the PPA.
+            # install_packages installs via apt install -y WITH recommends, so
+            # without the hold apt would pull amneziawg-dkms from the PPA, and a
+            # 3.0 tree in updates/dkms/ would land next to our 2.0 module in
+            # extra/. Two trees carrying a module of the SAME name is exactly what
+            # the hold exists to prevent. Reachable: the ubuntu-2510-arm64 and
+            # debian-trixie-arm64 prebuilt targets ship kernels 6.7+.
+            apt-mark hold amneziawg-dkms amneziawg >/dev/null 2>&1 || true
+            if ! apt-mark showhold 2>/dev/null | grep -qx "amneziawg-dkms"; then
+                die "Failed to put amneziawg-dkms on hold before installing amneziawg-tools. Without it the PPA module would land next to the prebuilt one - two trees named amneziawg. Check the apt/dpkg lock and run the script again: the prebuilt package is already installed, this step will simply repeat."
+            fi
             install_packages "amneziawg-tools" "wireguard-tools" "qrencode"
+            # POSTCONDITION. The PRECONDITION (the hold is in place) is verified
+            # above, but nobody checked the result - in between apt could have
+            # installed the package for a reason we did not foresee, or dkms may
+            # be left over from an earlier install on this very host. Check the
+            # fact rather than the precondition: the fact is what catches a real
+            # failure.
+            # ⚠️ Deliberately NOT a die: "dkms left over from a previous run" is
+            # already a broken state, but aborting the install over it is not
+            # something to ship without a run on an ARM bench, and an abort with
+            # no path to a fix leaves the person with nothing. Hence a loud
+            # warning with the exact command. Tightening this to a die is a
+            # separate task.
+            if dpkg-query -W -f='${Status}' amneziawg-dkms 2>/dev/null | grep -q "ok installed"; then
+                log_warn "WARNING: the amneziawg-dkms package is installed next to the prebuilt module."
+                log_warn "  How that ends was measured on a bench rather than guessed: as soon as kernel"
+                log_warn "  headers are present, DKMS builds, DISPLACES the prebuilt file from extra/, and"
+                log_warn "  after a reboot it is the one that loads - the server silently moves to the"
+                log_warn "  other protocol line. The tunnel keeps working, and dpkg still believes the"
+                log_warn "  prebuilt package is installed."
+                log_warn "  Remove the extra one: sudo apt-mark unhold amneziawg-dkms && sudo apt-get purge -y amneziawg-dkms"
+                log_warn "  then sudo apt-mark hold amneziawg-dkms, reinstall the module and reboot."
+            fi
             log "Step 2 completed (prebuilt ARM)."
             # request_reboot always terminates the process (exit), we never return here.
             request_reboot 3
@@ -3923,6 +3963,10 @@ step7_start_service() {
     else
         systemctl enable --now awg-quick@awg0 || die "enable --now error."
     fi
+    # The interface has just come up, so record the device-parameter set: the
+    # management script should know from the start what is on the live interface.
+    # Without this the very first removal detection would have nothing to compare.
+    awg_record_device_params
     log "Service enabled and started."
 
     log "Checking service status..."
